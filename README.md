@@ -14,3 +14,44 @@ Install with: `pip install --user .`
 
 
 More documentation forthcoming.
+
+
+## Use
+
+### Start a MongoDB with docker
+
+```
+docker run ... mongo
+```
+
+### Build a henge interface to your MongoDB back-end
+
+
+```
+import henge
+backend = henge.MongoDict(host='localhost', port=27017, database='my_dict',
+                        collection='store')
+
+schemas = {"sequence": yaml.safe_load(seq_schema), "asd": yaml.safe_load(asd),
+            "acd": yaml.safe_load(acd)}
+
+h = henge.Henge(backend, schemas=schemas)
+```
+
+
+### Stick stuff in it
+
+Henge will return the druid (*aka* digest, checksum, unique identifier) for your object, which you can later use to retrieve it
+
+```
+object = ...  # produce the object of the type your henge understands
+druid = h.insert(..., item_type=...)
+```
+
+You have to tell the henge what type of item you're inserting, which corresponds to one of the schemas you have used when instantiating the henge.
+
+### Retrieve stuff from it
+
+```
+h.retrieve(druid)
+```
