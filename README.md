@@ -1,41 +1,16 @@
-# A Skeleton Python CLI 
+# Henge 
 
-This repository contains a skeleton that shows you how to create a python package that behaves as a command-line tool. If you install this repository with `pip`, you will then have access to a new shell command called `packagename`.
+Henge is a python package that builds back-ends for generic decomposable recursive unique identifiers (or, *druids*). It is intended to be used as a building block for refget 2.0 on collections, and also potentially for other data types that need content-derived identifiers.
 
-## Packagename
+Henge provides 2 key advances:
+
+- decomposing: identifiers in henge will automatically retrieve tuples. these tuples can be tailored with a simple json schema document, so that henge can be used as a back-end for arbitrary data.
+
+- recursion: individual elements retrieved by the henge object can be tagged as recursive, which means these attributes contain their own druids. Henge can recurse through these.
+
+## Install
 
 Install with: `pip install --user .`
 
-Run with: `packagename -i INPUT -p PARAMETER`
 
-See: `packagename --help` for details.
-
-## Make it yours
-
-Just copy all the files in this repository into a new repository and then edit them. You can edit these files to replace `packagename` everywhere with the name of the tool you want to create. Then, just make the function call whatever python code you need it to.
-
-## Explanation
-
-The creation of a command-line tool happens in `setup.py` in the lines that say:
-
-```
-entry_points={
-    "console_scripts": [
-        'packagename = packagename.packagename:main'
-    ],
-},    
-```
-
-Here `packagename = ...` is the command that will eventually be created; and
-then `packagename.packagename` are 1) the name of the folder and then 2) the
-name of the file that you want the command to run. Finally, `:main` says to run
-the main function in that file.
-
-### Logmuse
-
-This package sets you up automatically to use the *logmuse* package, which gives
-your tool parameters like `--verbosity` and `--logdev`, which change the
-logging. You can use `_LOGGER.debug()` and `_LOGGER.info()`, and
-`_LOGGER.warn()`, *etc*, to emit different classes of error messages. It's
-already configured. You can read the logmuse documentation for more info.
-
+More documentation forthcoming.
