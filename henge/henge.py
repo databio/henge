@@ -1,4 +1,4 @@
-""" Computing configuration representation """
+""" An interface to a database back-end for DRUIDs """
 
 import argparse
 import logmuse
@@ -31,17 +31,30 @@ class MongoDict(mongodict.MongoDict):
 class Henge(object):
     def __init__(self, database, schemas, checksum_function=md5):
         """
-        A holding spot for DRUIDs.
+        A user interface to insert and retrieve decomposable recursive unique
+        identifiers (DRUIDs).
 
-        :@param database: Dict-like lookup database with sequences and hashes.
+        :param dict database: Dict-like lookup database with sequences and hashes.
+        :param dict schemas: One or more jsonschema schemas describing the
+            data types stored by this Henge
+        :param function(str) -> str checksum_function: Default function to handle the digest of the
+            serialized items stored in this henge.
         """
         self.database = database
         self.schemas = schemas
         self.checksum_function = checksum_function
-        self.checksum_function_version = "md5"
         self.digest_version = "md5"
 
     def retrieve(self, druid, reclimit=None, raw=False):
+        """
+        Retrieve an item given a digest
+
+        :param str druid: The Decomposible recursive unique identifier (DRUID), or
+            digest that uniquely identifies that item to retrieve.
+        :param int reclimit: Recursion limit. Set to None for no limit (default).
+        :param bool raw: Return the value as a raw, henge-delimited string, instead
+            of processing into a mapping. Default: False.
+        """
         try:
             string = self.database[druid]
         except KeyError:
@@ -64,10 +77,11 @@ class Henge(object):
                 else:
                     if 'recursive' in schema:
                         for recursive_attr in schema['recursive']:                    
-                            item_reconstituted[recursive_attr] = self.retrieve(
-                                item_reconstituted[recursive_attr],
-                                reclimit,
-                                raw)
+                            if item_reconstituted[recursive_attr] and item_reconstituted[recursive_attr] != "":
+                                item_reconstituted[recursive_attr] = self.retrieve(
+                                    item_reconstituted[recursive_attr],
+                                    reclimit,
+                                    raw)
             return item_reconstituted
 
         if not DELIM_ITEM in string:
@@ -79,10 +93,19 @@ class Henge(object):
 
 
     def list_item_types(self):
+        """
+        Returns a list of item types handled by this Henge instance.
+        """
         return self.schemas.keys()
 
 
     def select_item_type(self, item):
+        """
+        Returns a list of all item types handled by this instance that validate
+        with the given item.
+
+        :param dict item: The item you wish to validate type of.
+        """
         valid_schemas = []
         for name, schema in self.schemas.items():
             _LOGGER.debug("Testing schema: {}".format(name))
@@ -94,6 +117,15 @@ class Henge(object):
         return valid_schemas
 
     def insert(self, items, item_type=None):
+        """
+        Add items (of a specified type) the the database.
+
+        :param list items: List of items to add.
+        :param str item_type: A string specifying the type of item. Must match
+            something from Henge.list_item_types. You can use
+            Henge.select_item_type to automatically choose this, if only one
+            fits.
+        """
 
 
         if not item_type in self.schemas.keys():
@@ -108,8 +140,14 @@ class Henge(object):
         # also item_type ?
 
 
+        def safestr(item, x):
+            try:
+                return str(item[x])
+            except:
+                return ""
+
         def build_attr_string(item, schema):
-            return DELIM_ATTR.join([str(item[x]) for x in list(schema['properties'].keys())])
+            return DELIM_ATTR.join([safestr(item, x) for x in list(schema['properties'].keys())])
 
         attr_strings = []
         for item in items:
@@ -119,6 +157,8 @@ class Henge(object):
                 jsonschema.validate(item, valid_schema)
             except Exception as e:
                 _LOGGER.error("Not valid data")
+                _LOGGER.error("Attempting to insert item: {}".format(item))
+                _LOGGER.error("Item type: {}".format(item_type))
                 print(e)
                 return False
             
@@ -128,12 +168,16 @@ class Henge(object):
         attr_string = DELIM_ITEM.join(attr_strings)
         druid = self.checksum_function(attr_string)
         # self.database[druid] = attr_string
-        self.henge_insert(druid, attr_string, item_type)
+        self._henge_insert(druid, attr_string, item_type)
         _LOGGER.info("Loaded {}".format(druid))
         return druid
         
 
-    def henge_insert(self, druid, string, item_type, digest_version=None):
+    def _henge_insert(self, druid, string, item_type, digest_version=None):
+        """
+        Inserts an item into the database, with henge-metadata slots for item
+        type and digest version.
+        """
         if not digest_version:
             digest_version = self.digest_version
         self.database[druid] = string
@@ -142,6 +186,9 @@ class Henge(object):
 
 
     def clean(self):
+        """
+        Remove all items from the database.
+        """
         for k,v in self.database.items():
             try:
                 del self.database[k]
@@ -151,6 +198,9 @@ class Henge(object):
                 pass
 
     def show(self):
+        """
+        Show all items in the database.
+        """
         for k,v in self.database.items():
             print(k, v)   
 
@@ -169,7 +219,7 @@ def build_argparser():
     :return argparse.ArgumentParser
     """
 
-    banner = "%(prog)s - randomize BED files"
+    banner = "%(prog)s - "
     additional_description = "\n..."
 
     parser = _VersionInHelpParser(
@@ -211,3 +261,4 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         _LOGGER.error("Program canceled by user!")
         sys.exit(1)
+
