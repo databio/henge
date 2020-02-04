@@ -1,10 +1,10 @@
 # Henge 
 
-Henge is a python package that builds back-ends for generic decomposable recursive unique identifiers (or, *druids*). It is intended to be used as a building block for refget 2.0 on collections, and also potentially for other data types that need content-derived identifiers.
+Henge is a python package that builds back-ends for generic decomposable recursive unique identifiers (or, *druids*). It is intended to be used as a building block for refget 2.0 on collections, and also for other data types that need content-derived identifiers.
 
 Henge provides 2 key advances:
 
-- decomposing: identifiers in henge will automatically retrieve tuples. these tuples can be tailored with a simple json schema document, so that henge can be used as a back-end for arbitrary data.
+- decomposing: identifiers in henge will automatically retrieve tuples. These tuples can be tailored with a simple json schema document, so that henge can be used as a back-end for arbitrary data.
 
 - recursion: individual elements retrieved by the henge object can be tagged as recursive, which means these attributes contain their own druids. Henge can recurse through these.
 
@@ -21,8 +21,15 @@ More documentation forthcoming.
 ### Start a MongoDB with docker
 
 ```
-docker run ... mongo
+docker run -p 27017:27017 ... mongo
 ```
+
+For persistent storage, mount a folder to `/data/db`, and if that's a remote filesystem, make sure to map the user/group so the container has permissions to read/write the filesystem. Here's an example command: 
+
+```
+docker run -it -p 27017:27017 --user=854360:25014 -v /ext/qumulo/database/mongo:/data/db mongo
+```
+
 
 ### Build a henge interface to your MongoDB back-end
 

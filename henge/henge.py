@@ -67,11 +67,14 @@ class Henge(object):
                     return string
                 item_reconstituted = {self.database[druid + "_item_type"]: string}
             else:
-                attr_array = string.split(DELIM_ATTR)
                 item_type = self.database[druid + "_item_type"]
-                _LOGGER.info("item_type: {}".format(item_type))
+                _LOGGER.debug("item_type: {}".format(item_type))
                 schema = self.schemas[item_type]
-                item_reconstituted = dict(zip(schema['properties'].keys(), attr_array))
+                if schema["type"] == "array":
+                    attr_array = string.split(DELIM_ATTR)
+                    item_reconstituted = dict(zip(schema['items']['properties'].keys(), attr_array))    
+                elif schema["type"] == "object":
+                    item_reconstituted = dict(zip(schema['properties'].keys(), attr_array))
                 if (isinstance(reclimit, int) and reclimit == 0):
                     return item_reconstituted
                 else:
@@ -116,7 +119,7 @@ class Henge(object):
                 continue
         return valid_schemas
 
-    def insert(self, items, item_type=None):
+    def insert(self, item, item_type=None):
         """
         Add items (of a specified type) the the database.
 
@@ -147,25 +150,24 @@ class Henge(object):
                 return ""
 
         def build_attr_string(item, schema):
-            return DELIM_ATTR.join([safestr(item, x) for x in list(schema['properties'].keys())])
+            if schema["type"] == "object":
+                return DELIM_ATTR.join([safestr(item, x) for x in list(schema['properties'].keys())])
+            if schema["type"] == "array":
+                return DELIM_ITEM.join([build_attr_string(x, schema['items']) for x in item])
 
         attr_strings = []
-        for item in items:
-            valid_schema = self.schemas[item_type]
-            # Add defaults here ?
-            try: 
-                jsonschema.validate(item, valid_schema)
-            except Exception as e:
-                _LOGGER.error("Not valid data")
-                _LOGGER.error("Attempting to insert item: {}".format(item))
-                _LOGGER.error("Item type: {}".format(item_type))
-                print(e)
-                return False
+        valid_schema = self.schemas[item_type]
+        # Add defaults here ?
+        try: 
+            jsonschema.validate(item, valid_schema)
+        except Exception as e:
+            _LOGGER.error("Not valid data")
+            _LOGGER.error("Attempting to insert item: {}".format(item))
+            _LOGGER.error("Item type: {}".format(item_type))
+            print(e)
+            return False
             
-
-            attr_strings.append(build_attr_string(item, valid_schema))
-
-        attr_string = DELIM_ITEM.join(attr_strings)
+        attr_string = build_attr_string(item, valid_schema)
         druid = self.checksum_function(attr_string)
         # self.database[druid] = attr_string
         self._henge_insert(druid, attr_string, item_type)
