@@ -74,6 +74,7 @@ class Henge(object):
                     attr_array = string.split(DELIM_ATTR)
                     item_reconstituted = dict(zip(schema['items']['properties'].keys(), attr_array))    
                 elif schema["type"] == "object":
+                    attr_array = string.split(DELIM_ATTR)
                     item_reconstituted = dict(zip(schema['properties'].keys(), attr_array))
                 if (isinstance(reclimit, int) and reclimit == 0):
                     return item_reconstituted
@@ -150,10 +151,12 @@ class Henge(object):
                 return ""
 
         def build_attr_string(item, schema):
-            if schema["type"] == "object":
-                return DELIM_ATTR.join([safestr(item, x) for x in list(schema['properties'].keys())])
-            if schema["type"] == "array":
+
+            if "type" in schema and schema["type"] == "array":
                 return DELIM_ITEM.join([build_attr_string(x, schema['items']) for x in item])
+            # if schema["type"] == "object":
+            else:
+                return DELIM_ATTR.join([safestr(item, x) for x in list(schema['properties'].keys())])
 
         attr_strings = []
         valid_schema = self.schemas[item_type]
