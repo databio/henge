@@ -49,16 +49,34 @@ class Henge(object):
         """
         Retrieve an item given a digest
 
-        :param str druid: The Decomposible recursive unique identifier (DRUID), or
+        :param str druid: The Decomposable recursive unique identifier (DRUID), or
             digest that uniquely identifies that item to retrieve.
         :param int reclimit: Recursion limit. Set to None for no limit (default).
         :param bool raw: Return the value as a raw, henge-delimited string, instead
             of processing into a mapping. Default: False.
         """
-        try:
-            string = self.database[druid]
-        except KeyError:
-            return "Not found"
+
+        def reconstruct_item(string, schema, reclimit):
+            if "type" in schema and schema["type"] == "array":
+                return [reconstruct_item(substr, schema["items"], reclimit) for substr in string.split(DELIM_ITEM)]
+            # if schema["type"] == "object":
+            else:  # assume it's an object
+                attr_array = string.split(DELIM_ATTR)
+                item_reconstituted = dict(zip(schema['properties'].keys(), attr_array))
+                _LOGGER.debug(schema)
+                if 'recursive' in schema:
+                    if isinstance(reclimit, int) and reclimit == 0:
+                        return item_reconstituted
+                    else:
+                        if isinstance(reclimit, int):
+                            reclimit = reclimit - 1
+                        for recursive_attr in schema['recursive']:                    
+                            if item_reconstituted[recursive_attr] and item_reconstituted[recursive_attr] != "":
+                                item_reconstituted[recursive_attr] = self.retrieve(
+                                    item_reconstituted[recursive_attr],
+                                    reclimit,
+                                    raw)                
+                return item_reconstituted
 
 
         def process_item(string, reclimit):
@@ -88,19 +106,27 @@ class Henge(object):
                                     raw)
             return item_reconstituted
 
-        if not DELIM_ITEM in string:
-            return process_item(string, reclimit)
-        else:  # Recursive case
-            if isinstance(reclimit, int):
-                reclimit = reclimit - 1
-            return [process_item(item, reclimit) for item in string.split(DELIM_ITEM)]
+        try:
+            string = self.database[druid]
+        except KeyError:
+            return "Not found"
+
+        item_type = self.database[druid + "_item_type"]
+        _LOGGER.debug("item_type: {}".format(item_type))
+        schema = self.schemas[item_type]
+
+
+        return reconstruct_item(string, schema, reclimit)
+
 
 
     def list_item_types(self):
         """
-        Returns a list of item types handled by this Henge instance.
+        Prints and returns a list of item types handled by this Henge instance.
         """
-        return self.schemas.keys()
+        for k, v in self.schemas.items():
+            print("{}: {}".format(k, v["description"]))
+        return list(self.schemas.keys())
 
 
     def select_item_type(self, item):
@@ -134,7 +160,7 @@ class Henge(object):
 
         if not item_type in self.schemas.keys():
             _LOGGER.error("I don't know about items of type '{}'. I know of: '{}'".format(
-                item_type, self.schemas.keys()))
+                item_type, list(self.schemas.keys())))
             return False
 
         # digest_version should be automatically appended to the item by the
@@ -155,7 +181,7 @@ class Henge(object):
             if "type" in schema and schema["type"] == "array":
                 return DELIM_ITEM.join([build_attr_string(x, schema['items']) for x in item])
             # if schema["type"] == "object":
-            else:
+            else:  # assume it's an object
                 return DELIM_ATTR.join([safestr(item, x) for x in list(schema['properties'].keys())])
 
         attr_strings = []
