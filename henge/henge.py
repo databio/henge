@@ -16,6 +16,7 @@ import yaml
 from . import __version__
 from collections import OrderedDict
 from ubiquerg import is_url
+from yacman import load_yaml
 
 
 pymongo.Connection = lambda host, port, **kwargs: pymongo.MongoClient(host=host, port=port)
@@ -214,30 +215,6 @@ class Henge(object):
         for k,v in self.database.items():
             print(k, v)   
 
-
-def load_yaml(filepath):
-    """ Load a yaml file into a python dict """
-
-    if is_url(filepath):
-        _LOGGER.info("Got URL: {}".format(filepath))
-        try: #python3
-            from urllib.request import urlopen
-            from urllib.error import HTTPError
-        except: #python2
-            from urllib2 import urlopen       
-            from urllib2 import URLError as HTTPError
-        try:
-            response = urlopen(filepath)
-        except HTTPError as e:
-            raise e
-        data = response.read()      # a `bytes` object
-        text = data.decode('utf-8')
-        manifest_lines = yacman.YacAttMap(yamldata=text)
-    else:
-        manifest_lines = yacman.YacAttMap(filepath=filepath) 
-        # yaml.safe_load(f)
-
-    return manifest_lines
 
 class _VersionInHelpParser(argparse.ArgumentParser):
     def format_help(self):
