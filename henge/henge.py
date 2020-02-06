@@ -3,18 +3,22 @@
 import argparse
 import logmuse
 import os
-from . import __version__
-from collections import OrderedDict
 import hashlib
 import jsonschema
 import pymongo
-pymongo.Connection = lambda host, port, **kwargs: pymongo.MongoClient(host=host, port=port)
 import logging
-import mongodict
-import yaml
 import logmuse
+import mongodict
+import yacman
+import yaml
 
 
+from . import __version__
+from collections import OrderedDict
+from ubiquerg import is_url
+
+
+pymongo.Connection = lambda host, port, **kwargs: pymongo.MongoClient(host=host, port=port)
 _LOGGER = logging.getLogger(__name__)
 
 def md5(seq):
@@ -24,8 +28,11 @@ def md5(seq):
 
 DELIM_ATTR = "\x1e" # chr(30); separating attributes in an item
 DELIM_ITEM = "\t" #  separating items in a collection
+ITEM_TYPE = "_item_type"
+
 
 class MongoDict(mongodict.MongoDict):
+    """ Just a passthrough to export MongoDict directly here """
     pass
 
 class Henge(object):
@@ -78,40 +85,12 @@ class Henge(object):
                                     raw)                
                 return item_reconstituted
 
-
-        def process_item(string, reclimit):
-            if not DELIM_ATTR in string: 
-                if raw:
-                    return string
-                item_reconstituted = {self.database[druid + "_item_type"]: string}
-            else:
-                item_type = self.database[druid + "_item_type"]
-                _LOGGER.debug("item_type: {}".format(item_type))
-                schema = self.schemas[item_type]
-                if schema["type"] == "array":
-                    attr_array = string.split(DELIM_ATTR)
-                    item_reconstituted = dict(zip(schema['items']['properties'].keys(), attr_array))    
-                elif schema["type"] == "object":
-                    attr_array = string.split(DELIM_ATTR)
-                    item_reconstituted = dict(zip(schema['properties'].keys(), attr_array))
-                if (isinstance(reclimit, int) and reclimit == 0):
-                    return item_reconstituted
-                else:
-                    if 'recursive' in schema:
-                        for recursive_attr in schema['recursive']:                    
-                            if item_reconstituted[recursive_attr] and item_reconstituted[recursive_attr] != "":
-                                item_reconstituted[recursive_attr] = self.retrieve(
-                                    item_reconstituted[recursive_attr],
-                                    reclimit,
-                                    raw)
-            return item_reconstituted
-
         try:
             string = self.database[druid]
         except KeyError:
             return "Not found"
 
-        item_type = self.database[druid + "_item_type"]
+        item_type = self.database[druid + ITEM_TYPE]
         _LOGGER.debug("item_type: {}".format(item_type))
         schema = self.schemas[item_type]
 
@@ -212,7 +191,7 @@ class Henge(object):
         if not digest_version:
             digest_version = self.digest_version
         self.database[druid] = string
-        self.database[druid + "_item_type"] = item_type
+        self.database[druid + ITEM_TYPE] = item_type
         self.database[druid + "_digest_version"] = digest_version
 
 
@@ -223,7 +202,7 @@ class Henge(object):
         for k,v in self.database.items():
             try:
                 del self.database[k]
-                del self.database[k + "_item_type"]
+                del self.database[k + ITEM_TYPE]
                 del self.database[k + "_digest_version"]
             except:
                 pass
@@ -235,6 +214,30 @@ class Henge(object):
         for k,v in self.database.items():
             print(k, v)   
 
+
+def load_yaml(filepath):
+    """ Load a yaml file into a python dict """
+
+    if is_url(filepath):
+        _LOGGER.info("Got URL: {}".format(filepath))
+        try: #python3
+            from urllib.request import urlopen
+            from urllib.error import HTTPError
+        except: #python2
+            from urllib2 import urlopen       
+            from urllib2 import URLError as HTTPError
+        try:
+            response = urlopen(filepath)
+        except HTTPError as e:
+            raise e
+        data = response.read()      # a `bytes` object
+        text = data.decode('utf-8')
+        manifest_lines = yacman.YacAttMap(yamldata=text)
+    else:
+        manifest_lines = yacman.YacAttMap(filepath=filepath) 
+        # yaml.safe_load(f)
+
+    return manifest_lines
 
 class _VersionInHelpParser(argparse.ArgumentParser):
     def format_help(self):

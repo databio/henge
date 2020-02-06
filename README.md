@@ -21,15 +21,16 @@ More documentation forthcoming.
 ### Start a MongoDB with docker
 
 ```
-docker run -p 27017:27017 ... mongo
+docker run --network="host" ... mongo
 ```
 
 For persistent storage, mount a folder to `/data/db`, and if that's a remote filesystem, make sure to map the user/group so the container has permissions to read/write the filesystem. Here's an example command: 
 
 ```
-docker run -it -p 27017:27017 --user=854360:25014 -v /ext/qumulo/database/mongo:/data/db mongo
+docker run -it --network="host" --user=854360:25014 -v /ext/qumulo/database/mongo:/data/db mongo
 ```
 
+In production you can use `-p 27017:27017` instead of `network="host"`, but on a dev server, the network command is more secure because it obeys firewall rules, while the `-p` potentially opens a port despite the firewall settings.
 
 ### Build a henge interface to your MongoDB back-end
 
