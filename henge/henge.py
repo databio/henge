@@ -37,21 +37,38 @@ class MongoDict(mongodict.MongoDict):
     pass
 
 class Henge(object):
-    def __init__(self, database, schemas, checksum_function=md5):
+    def __init__(self, database, schemas, henges=None, checksum_function=md5):
         """
         A user interface to insert and retrieve decomposable recursive unique
         identifiers (DRUIDs).
 
-        :param dict database: Dict-like lookup database with sequences and hashes.
+        :param dict database: Dict-like lookup database for sequences and
+            hashes.
         :param dict schemas: One or more jsonschema schemas describing the
             data types stored by this Henge
-        :param function(str) -> str checksum_function: Default function to handle the digest of the
-            serialized items stored in this henge.
+        :param dict henges: One or more henge objects indexed by object name for
+            remote storing of items.
+        :param function(str) -> str checksum_function: Default function to
+            handle the digest of the serialized items stored in this henge.
         """
         self.database = database
         self.schemas = schemas
         self.checksum_function = checksum_function
         self.digest_version = "md5"
+
+        # Identify which henge to use for each item type. Default to self:
+        self.henges = {}
+        my_item_types = self.list_item_types()
+        for item_type in my_item_types:
+            self.henges[item_type] = self
+
+        # Next add in any remote henges for item types not stored in self:
+        if henges:
+            for item_type, henge in henges.items():
+                if not item_type in my_item_types:
+                    self.schemas[item_type] = henge.schemas[item_type]
+                    self.henges[item_type] = henge
+
 
     def retrieve(self, druid, reclimit=None, raw=False):
         """
@@ -86,16 +103,17 @@ class Henge(object):
                                     raw)                
                 return item_reconstituted
 
-        try:
-            string = self.database[druid]
-        except KeyError:
-            return "Not found"
 
         item_type = self.database[druid + ITEM_TYPE]
         _LOGGER.debug("item_type: {}".format(item_type))
+        henge_to_query = self.henges[item_type]
+        _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
+        try:
+            string = henge_to_query.database[druid]
+        except KeyError:
+            return "Not found"
+
         schema = self.schemas[item_type]
-
-
         return reconstruct_item(string, schema, reclimit)
 
 
@@ -191,14 +209,29 @@ class Henge(object):
         """
         if not digest_version:
             digest_version = self.digest_version
-        self.database[druid] = string
-        self.database[druid + ITEM_TYPE] = item_type
-        self.database[druid + "_digest_version"] = digest_version
+
+        # Here we could do a few things; should we put this metadata into the
+        # interface henge or the henge where the storage actually occurs? it
+        # MUST be in the interface henge; should it also be in the storage
+        # henge?
+
+        henge_to_query = self.henges[item_type]
+        _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
+        try:
+            henge_to_query.database[druid] = string
+            henge_to_query.database[druid + ITEM_TYPE] = item_type
+            henge_to_query.database[druid + "_digest_version"] = digest_version
+
+            if henge_to_query != self:
+                self.database[druid + ITEM_TYPE] = item_type
+                self.database[druid + "_digest_version"] = digest_version
+        except Exception as e:
+            raise e
 
 
     def clean(self):
         """
-        Remove all items from the database.
+        Remove all items from this database.
         """
         for k,v in self.database.items():
             try:
