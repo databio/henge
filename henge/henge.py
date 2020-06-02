@@ -116,16 +116,13 @@ class Henge(object):
         schema = self.schemas[item_type]
         return reconstruct_item(string, schema, reclimit)
 
-
-
     def list_item_types(self):
         """
         Prints and returns a list of item types handled by this Henge instance.
         """
         for k, v in self.schemas.items():
-            print("{}: {}".format(k, v["description"]))
+            _LOGGER.debug("{}: {}".format(k, v["description"]))
         return list(self.schemas.keys())
-
 
     def select_item_type(self, item):
         """
@@ -198,9 +195,8 @@ class Henge(object):
         druid = self.checksum_function(attr_string)
         # self.database[druid] = attr_string
         self._henge_insert(druid, attr_string, item_type)
-        _LOGGER.info("Loaded {}".format(druid))
+        _LOGGER.debug("Loaded {}".format(druid))
         return druid
-        
 
     def _henge_insert(self, druid, string, item_type, digest_version=None):
         """
