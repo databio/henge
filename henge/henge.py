@@ -1,40 +1,35 @@
 """ An interface to a database back-end for DRUIDs """
 
-import argparse
 import logmuse
-import os
 import hashlib
 import jsonschema
 import pymongo
 import logging
 import logmuse
 import mongodict
-import yacman
-import yaml
+import sys
 
+from ubiquerg import VersionInHelpParser
 
 from . import __version__
-from collections import OrderedDict
-from ubiquerg import is_url
-from yacman import load_yaml
-
 
 pymongo.Connection = lambda host, port, **kwargs: pymongo.MongoClient(host=host, port=port)
 _LOGGER = logging.getLogger(__name__)
+
 
 def md5(seq):
     return hashlib.md5(seq.encode()).hexdigest()
 
 
-
-DELIM_ATTR = "\x1e" # chr(30); separating attributes in an item
-DELIM_ITEM = "\t" #  separating items in a collection
+DELIM_ATTR = "\x1e"  # chr(30); separating attributes in an item
+DELIM_ITEM = "\t"  # separating items in a collection
 ITEM_TYPE = "_item_type"
 
 
 class MongoDict(mongodict.MongoDict):
     """ Just a passthrough to export MongoDict directly here """
     pass
+
 
 class Henge(object):
     def __init__(self, database, schemas, henges=None, checksum_function=md5):
@@ -58,17 +53,15 @@ class Henge(object):
 
         # Identify which henge to use for each item type. Default to self:
         self.henges = {}
-        my_item_types = self.list_item_types()
-        for item_type in my_item_types:
+        for item_type in self.item_types:
             self.henges[item_type] = self
 
         # Next add in any remote henges for item types not stored in self:
         if henges:
             for item_type, henge in henges.items():
-                if not item_type in my_item_types:
+                if item_type not in self.item_types:
                     self.schemas[item_type] = henge.schemas[item_type]
                     self.henges[item_type] = henge
-
 
     def retrieve(self, druid, reclimit=None, raw=False):
         """
@@ -83,11 +76,13 @@ class Henge(object):
 
         def reconstruct_item(string, schema, reclimit):
             if "type" in schema and schema["type"] == "array":
-                return [reconstruct_item(substr, schema["items"], reclimit) for substr in string.split(DELIM_ITEM)]
+                return [reconstruct_item(substr, schema["items"], reclimit)
+                        for substr in string.split(DELIM_ITEM)]
             # if schema["type"] == "object":
             else:  # assume it's an object
                 attr_array = string.split(DELIM_ATTR)
-                item_reconstituted = dict(zip(schema['properties'].keys(), attr_array))
+                item_reconstituted = dict(zip(schema['properties'].keys(),
+                                              attr_array))
                 _LOGGER.debug(schema)
                 if 'recursive' in schema:
                     if isinstance(reclimit, int) and reclimit == 0:
@@ -96,13 +91,13 @@ class Henge(object):
                         if isinstance(reclimit, int):
                             reclimit = reclimit - 1
                         for recursive_attr in schema['recursive']:                    
-                            if item_reconstituted[recursive_attr] and item_reconstituted[recursive_attr] != "":
+                            if item_reconstituted[recursive_attr] \
+                                    and item_reconstituted[recursive_attr] != "":
                                 item_reconstituted[recursive_attr] = self.retrieve(
                                     item_reconstituted[recursive_attr],
                                     reclimit,
                                     raw)                
                 return item_reconstituted
-
 
         item_type = self.database[druid + ITEM_TYPE]
         _LOGGER.debug("item_type: {}".format(item_type))
@@ -116,12 +111,11 @@ class Henge(object):
         schema = self.schemas[item_type]
         return reconstruct_item(string, schema, reclimit)
 
-    def list_item_types(self):
+    @property
+    def item_types(self):
         """
-        Prints and returns a list of item types handled by this Henge instance.
+        A list of item types handled by this Henge instance
         """
-        for k, v in self.schemas.items():
-            _LOGGER.debug("{}: {}".format(k, v["description"]))
         return list(self.schemas.keys())
 
     def select_item_type(self, item):
@@ -151,11 +145,10 @@ class Henge(object):
             Henge.select_item_type to automatically choose this, if only one
             fits.
         """
-
-
-        if not item_type in self.schemas.keys():
-            _LOGGER.error("I don't know about items of type '{}'. I know of: '{}'".format(
-                item_type, list(self.schemas.keys())))
+        if item_type not in self.schemas.keys():
+            _LOGGER.error("I don't know about items of type '{}'. "
+                          "I know of: '{}'".format(item_type,
+                                                   list(self.schemas.keys())))
             return False
 
         # digest_version should be automatically appended to the item by the
@@ -163,7 +156,6 @@ class Henge(object):
         # should also populate any missing attributes with default values. can
         # jsonschema do this automatically?
         # also item_type ?
-
 
         def safestr(item, x):
             try:
@@ -174,10 +166,12 @@ class Henge(object):
         def build_attr_string(item, schema):
 
             if "type" in schema and schema["type"] == "array":
-                return DELIM_ITEM.join([build_attr_string(x, schema['items']) for x in item])
+                return DELIM_ITEM.join([build_attr_string(x, schema['items'])
+                                        for x in item])
             # if schema["type"] == "object":
             else:  # assume it's an object
-                return DELIM_ATTR.join([safestr(item, x) for x in list(schema['properties'].keys())])
+                return DELIM_ATTR.join([safestr(item, x) for x in
+                                        list(schema['properties'].keys())])
 
         attr_strings = []
         valid_schema = self.schemas[item_type]
@@ -224,12 +218,11 @@ class Henge(object):
         except Exception as e:
             raise e
 
-
     def clean(self):
         """
         Remove all items from this database.
         """
-        for k,v in self.database.items():
+        for k, v in self.database.items():
             try:
                 del self.database[k]
                 del self.database[k + ITEM_TYPE]
@@ -241,15 +234,8 @@ class Henge(object):
         """
         Show all items in the database.
         """
-        for k,v in self.database.items():
+        for k, v in self.database.items():
             print(k, v)   
-
-
-class _VersionInHelpParser(argparse.ArgumentParser):
-    def format_help(self):
-        """ Add version information to help text. """
-        return "version: {}\n".format(__version__) + \
-               super(_VersionInHelpParser, self).format_help()
 
 
 def build_argparser():
@@ -258,13 +244,11 @@ def build_argparser():
 
     :return argparse.ArgumentParser
     """
-
-    banner = "%(prog)s - "
+    banner = "%(prog)s - Keeper of druids: " \
+             "a python interface to Decomposable Recursive UIDs"
     additional_description = "\n..."
-
-    parser = _VersionInHelpParser(
-            description=banner,
-            epilog=additional_description)
+    parser = VersionInHelpParser(version=__version__, description=banner,
+                                 epilog=additional_description)
 
     parser.add_argument(
             "-V", "--version",
@@ -282,8 +266,6 @@ def build_argparser():
     return parser
 
 
-
-
 def main():
     """ Primary workflow """
 
@@ -295,10 +277,10 @@ def main():
     msg = "Input: {input}; Parameter: {parameter}"
     _LOGGER.info(msg.format(input=args.input, parameter=args.parameter))
 
+
 if __name__ == '__main__':
     try:
         sys.exit(main())
     except KeyboardInterrupt:
         _LOGGER.error("Program canceled by user!")
         sys.exit(1)
-
