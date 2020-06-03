@@ -3,17 +3,14 @@
 import logmuse
 import hashlib
 import jsonschema
-import pymongo
 import logging
 import logmuse
-import mongodict
 import sys
 
 from ubiquerg import VersionInHelpParser
 
 from . import __version__
 
-pymongo.Connection = lambda host, port, **kwargs: pymongo.MongoClient(host=host, port=port)
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -24,11 +21,6 @@ def md5(seq):
 DELIM_ATTR = "\x1e"  # chr(30); separating attributes in an item
 DELIM_ITEM = "\t"  # separating items in a collection
 ITEM_TYPE = "_item_type"
-
-
-class MongoDict(mongodict.MongoDict):
-    """ Just a passthrough to export MongoDict directly here """
-    pass
 
 
 class Henge(object):
@@ -239,6 +231,7 @@ class Henge(object):
 
 
 def build_argparser():
+    # TODO: add cli hooks for ^
     """
     Builds argument parser.
 
