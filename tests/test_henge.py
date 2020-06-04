@@ -22,3 +22,22 @@ class TestInserting:
             assert isinstance(h.insert(x, item_type=type_key), bool)
             assert not h.insert(x, item_type=type_key)
 
+
+class TestRetrieval:
+    @pytest.mark.parametrize("x", [
+        ({"string_attr": "12321%@!", "integer_attr": 2}),
+        ({"string_attr": "string", "integer_attr": 1}),
+        ({"string_attr": "string"})
+    ])
+    def test_retrieve_returns_inserted_obj(self, schema, x):
+        type_key = "schema"
+        h = Henge(database={}, schemas={type_key: schema})
+        d = h.insert(x, item_type=type_key)
+        # returns str versions of inserted data
+        if len(x) > 1:
+            assert h.retrieve(d) == {k: str(v) for k, v in x.items()}
+        else:
+            assert not h.retrieve(d) == {k: str(v) for k, v in x.items()}
+
+
+
