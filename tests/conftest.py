@@ -1,7 +1,7 @@
 """ Test suite shared objects and setup """
 import os
 import pytest
-import yaml
+import oyaml as yaml
 
 
 @pytest.fixture

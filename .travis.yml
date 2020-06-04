@@ -8,6 +8,7 @@ os:
   - linux
 install:
   - pip install .
+  - pip install -r requirements/requirements-test.txt
 script: pytest --remote-data --cov=henge
 branches:
   only:
