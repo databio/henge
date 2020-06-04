@@ -9,7 +9,7 @@ os:
 install:
   - pip install .
   - pip install -r requirements/requirements-test.txt
-script: pytest --remote-data --cov=henge
+script: pytest tests
 branches:
   only:
     - dev
