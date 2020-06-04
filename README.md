@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/databio/henge.svg?branch=master)](https://travis-ci.com/databio/henge)
+
 # Henge 
 
 Henge is a python package that builds back-ends for generic decomposable recursive unique identifiers (or, *druids*). It is intended to be used as a building block for refget 2.0 on collections, and also for other data types that need content-derived identifiers.
