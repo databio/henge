@@ -1,0 +1,8 @@
+description: "Schema for a single raw sequence"
+type: object
+properties:
+  sequence:
+    type: string
+    description: "Actual sequence content"
+required:
+  - sequence

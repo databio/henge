@@ -170,7 +170,7 @@ class Henge(object):
         # Add defaults here ?
         try: 
             jsonschema.validate(item, valid_schema)
-        except Exception as e:
+        except jsonschema.ValidationError as e:
             _LOGGER.error("Not valid data")
             _LOGGER.error("Attempting to insert item: {}".format(item))
             _LOGGER.error("Item type: {}".format(item_type))
