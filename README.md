@@ -2,25 +2,46 @@
 
 # Henge 
 
-Henge is a python package that builds back-ends for generic decomposable recursive unique identifiers (or, *druids*). It is intended to be used as a building block for refget 2.0 on collections, and also for other data types that need content-derived identifiers.
+Henge is a Python package that builds back-ends for generic decomposable recursive unique identifiers (or, *druids*). It is intended to be used as a building block for refget 2.0 on collections (see [`refget-py`](https://github.com/databio/refget-py) package), and also for other data types that need content-derived identifiers.
 
-Henge provides 2 key advances:
+**Henge provides 2 key advances:**
 
-- decomposing: identifiers in henge will automatically retrieve tuples. These tuples can be tailored with a simple json schema document, so that henge can be used as a back-end for arbitrary data.
+- decomposing: identifiers in henge will automatically retrieve tuples. These tuples can be tailored with a simple JSON schema document, so that henge can be used as a back-end for arbitrary data.
 
-- recursion: individual elements retrieved by the henge object can be tagged as recursive, which means these attributes contain their own druids. Henge can recurse through these.
+- recursion: individual elements retrieved by the henge object can be tagged as recursive, which means these attributes contain their own DRUIDs (short for *Decomposable Recursive Unique IDs*). Henge can recurse through these.
 
 ## Install
 
 Install with: `pip install --user .`
 
 
-More documentation forthcoming.
-
-
 ## Use
 
-### Start a MongoDB with docker
+`Henge` constructor requires 2 argumets: 
+
+1. a `dict` of schemas to validate inserted object aginst
+2. a backend for data storage 
+
+### No data persistence
+
+In the simple case just use a Python `dict` object as `database`
+
+```python
+schemas = {"sequence": yaml.safe_load(seq_schema), "asd": yaml.safe_load(asd),
+            "acd": yaml.safe_load(acd)}
+
+h = henge.Henge(database={}, schemas=schemas)
+
+```
+
+### Data persistence
+
+If you the data to persist, you need to connect `Henge` object to a running database instance, for example [MongoDB](https://www.mongodb.com/).
+
+Here are the example steps to do it:
+
+
+1. **Start a MongoDB with docker**
 
 ```
 docker run --network="host" ... mongo
@@ -34,18 +55,16 @@ docker run -it --network="host" --user=854360:25014 -v /ext/qumulo/database/mong
 
 In production you can use `-p 27017:27017` instead of `network="host"`, but on a dev server, the network command is more secure because it obeys firewall rules, while the `-p` potentially opens a port despite the firewall settings.
 
-### Build a henge interface to your MongoDB back-end
+2. **Point `Henge` to your MongoDB backend**
 
+Naturally, you need to have relevant packages installed.  In this case (for MongoDB backend): `pymongo` and `mongodict`.
 
 ```
 import henge
-backend = henge.MongoDict(host='localhost', port=27017, database='my_dict',
-                        collection='store')
-
 schemas = {"sequence": yaml.safe_load(seq_schema), "asd": yaml.safe_load(asd),
             "acd": yaml.safe_load(acd)}
 
-h = henge.Henge(backend, schemas=schemas)
+h = henge.Henge(henge.connect_mongo(), schemas=schemas)
 ```
 
 
