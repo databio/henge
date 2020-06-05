@@ -10,17 +10,13 @@ import sys
 from ubiquerg import VersionInHelpParser
 
 from . import __version__
+from .const import *
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def md5(seq):
     return hashlib.md5(seq.encode()).hexdigest()
-
-
-DELIM_ATTR = "\x1e"  # chr(30); separating attributes in an item
-DELIM_ITEM = "\t"  # separating items in a collection
-ITEM_TYPE = "_item_type"
 
 
 class Henge(object):
@@ -123,7 +119,7 @@ class Henge(object):
             try:
                 jsonschema.validate(item, schema)
                 valid_schemas.append(name)
-            except:
+            except jsonschema.ValidationError:
                 continue
         return valid_schemas
 
@@ -131,7 +127,7 @@ class Henge(object):
         """
         Add items (of a specified type) the the database.
 
-        :param list items: List of items to add.
+        :param list item: List of items to add.
         :param str item_type: A string specifying the type of item. Must match
             something from Henge.list_item_types. You can use
             Henge.select_item_type to automatically choose this, if only one
@@ -152,7 +148,7 @@ class Henge(object):
         def safestr(item, x):
             try:
                 return str(item[x])
-            except:
+            except (ValueError, TypeError, KeyError):
                 return ""
 
         def build_attr_string(item, schema):
@@ -165,7 +161,6 @@ class Henge(object):
                 return DELIM_ATTR.join([safestr(item, x) for x in
                                         list(schema['properties'].keys())])
 
-        attr_strings = []
         valid_schema = self.schemas[item_type]
         # Add defaults here ?
         try: 
@@ -179,7 +174,6 @@ class Henge(object):
             
         attr_string = build_attr_string(item, valid_schema)
         druid = self.checksum_function(attr_string)
-        # self.database[druid] = attr_string
         self._henge_insert(druid, attr_string, item_type)
         _LOGGER.debug("Loaded {}".format(druid))
         return druid
@@ -219,7 +213,7 @@ class Henge(object):
                 del self.database[k]
                 del self.database[k + ITEM_TYPE]
                 del self.database[k + "_digest_version"]
-            except:
+            except (KeyError, AttributeError):
                 pass
 
     def show(self):
@@ -227,7 +221,37 @@ class Henge(object):
         Show all items in the database.
         """
         for k, v in self.database.items():
-            print(k, v)   
+            print(k, v)
+
+
+def connect_mongo(host='0.0.0.0', port=27017, database='henge_dict',
+                  collection='store'):
+    """
+    Connect to mongoDB and return the mongoDB-backed dict object
+
+    Firstly, the required libraries are imported.
+
+    :param str host: DB address
+    :param int port: port DB is listening on
+    :param str database: DB name
+    :param str collection: collection key
+    :return mongodict.MongoDict: a dict backed by mongoDB, ready to use as a
+        Henge backend
+    """
+    from importlib import import_module
+    from inspect import stack
+    for lib in LIBS_BY_BACKEND["mongo"]:
+        try:
+            globals()[lib] = import_module(lib)
+        except ImportError:
+            raise ImportError(
+                "Requirements not met. Package '{}' is required to setup "
+                "mongoDB connection. Install the package an call '{}' again.".
+                    format(lib, stack()[0][3]))
+    pymongo.Connection = lambda host, port, **kwargs: \
+        pymongo.MongoClient(host=host, port=port)
+    return mongodict.MongoDict(host=host, port=port, database=database,
+                               collection=collection)
 
 
 def build_argparser():
