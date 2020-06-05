@@ -227,7 +227,7 @@ class Henge(object):
 def connect_mongo(host='0.0.0.0', port=27017, database='henge_dict',
                   collection='store'):
     """
-    Connect to mongoDB and return the mongoDB-backed dict object
+    Connect to MongoDB and return the MongoDB-backed dict object
 
     Firstly, the required libraries are imported.
 
@@ -235,7 +235,7 @@ def connect_mongo(host='0.0.0.0', port=27017, database='henge_dict',
     :param int port: port DB is listening on
     :param str database: DB name
     :param str collection: collection key
-    :return mongodict.MongoDict: a dict backed by mongoDB, ready to use as a
+    :return mongodict.MongoDict: a dict backed by MongoDB, ready to use as a
         Henge backend
     """
     from importlib import import_module
@@ -246,7 +246,7 @@ def connect_mongo(host='0.0.0.0', port=27017, database='henge_dict',
         except ImportError:
             raise ImportError(
                 "Requirements not met. Package '{}' is required to setup "
-                "mongoDB connection. Install the package an call '{}' again.".
+                "MongoDB connection. Install the package and call '{}' again.".
                     format(lib, stack()[0][3]))
     pymongo.Connection = lambda host, port, **kwargs: \
         pymongo.MongoClient(host=host, port=port)
