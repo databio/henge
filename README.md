@@ -16,8 +16,9 @@ Install with: `pip install --user .`
 
 
 ## Use
+*For full henge package documentation please refer [API documentation page](./docs/api.md)*
 
-`Henge` constructor requires 2 argumets: 
+`Henge` constructor requires 2 arguments: 
 
 1. a `dict` of schemas to validate inserted object aginst
 2. a backend for data storage 
