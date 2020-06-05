@@ -9,7 +9,7 @@ os:
 install:
   - pip install .
   - pip install -r requirements/requirements-test.txt
-script: pytest tests
+script: pytest tests -x -vv
 branches:
   only:
     - dev

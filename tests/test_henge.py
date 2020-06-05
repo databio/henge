@@ -39,5 +39,22 @@ class TestRetrieval:
         else:
             assert not h.retrieve(d) == {k: str(v) for k, v in x.items()}
 
-
-
+    @pytest.mark.parametrize(["seq", "anno"], [
+        ({"sequence": "ATGCAGTA"},
+         {"name": "seq1", "length": 10, "topology": "linear"}),
+        ({"sequence": "AAAAAAAA"},
+         {"name": "seq2", "length": 11, "topology": "linear"})
+    ])
+    def test_retrieve_recurses(self, schema_asd, schema_sequence, seq, anno):
+        h = Henge(database={}, schemas={"sequence": schema_sequence,
+                                        "ASD": schema_asd})
+        seq_digest = h.insert(seq, item_type="sequence")
+        anno.update({"sequence_digest": seq_digest})
+        asd = h.insert(anno, item_type="ASD")
+        res = h.retrieve(asd)
+        assert isinstance(res["sequence_digest"], dict)
+        assert isinstance(res["sequence_digest"]["sequence"], str)
+        assert res["sequence_digest"]["sequence"] == seq["sequence"]
+        res = h.retrieve(asd, reclimit=0)
+        assert isinstance(res["sequence_digest"], str)
+        assert res["sequence_digest"] == seq_digest
