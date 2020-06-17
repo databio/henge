@@ -23,11 +23,7 @@ with open("{}/_version.py".format(PACKAGE), 'r') as versionfile:
     version = versionfile.readline().split()[-1].strip("\"'\n")
 
 # Handle the pypi README formatting.
-try:
-    import pypandoc
-    long_description = pypandoc.convert_file('README.md', 'rst')
-except(IOError, ImportError, OSError):
-    long_description = open('README.md').read()
+long_description = open('README.md').read()
 
 setup(
     name=PACKAGE,
