@@ -1,0 +1,13 @@
+description: "Person"
+type: object
+henge_class: person
+properties:
+  name:
+    type: string
+    description: "String attribute"
+  age:
+    type: integer
+    description: "Integer attribute"
+required:
+  - name
+  

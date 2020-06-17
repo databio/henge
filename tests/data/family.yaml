@@ -1,0 +1,13 @@
+description: "Family"
+type: object
+properties:
+  parents:
+    type: string
+    description: "array attribute"
+  children:
+    type: string
+required:
+  - parents
+recursive:
+  - parents
+  - children

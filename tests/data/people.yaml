@@ -1,0 +1,13 @@
+description: "People"
+type: array
+items:
+  type: object
+  properties:
+    name:
+      type: string
+      description: "String attribute"
+    age:
+      type: integer
+      description: "Integer attribute"
+  required:
+    - name
