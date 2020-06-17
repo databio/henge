@@ -23,17 +23,13 @@ with open("{}/_version.py".format(PACKAGE), 'r') as versionfile:
     version = versionfile.readline().split()[-1].strip("\"'\n")
 
 # Handle the pypi README formatting.
-try:
-    import pypandoc
-    long_description = pypandoc.convert_file('README.md', 'rst')
-except(IOError, ImportError, OSError):
-    long_description = open('README.md').read()
+long_description = open('README.md').read()
 
 setup(
     name=PACKAGE,
     packages=[PACKAGE],
     version=version,
-    description="package description",
+    description="Storage and retrieval of object-derived, decomposable recursive unique identifiers.",
     long_description=long_description,
     long_description_content_type='text/markdown',
     classifiers=[
