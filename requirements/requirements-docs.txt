@@ -1,0 +1,3 @@
+mkdocs>=1.0
+https://github.com/databio/mkdocs-databio/archive/master.zip
+henge
