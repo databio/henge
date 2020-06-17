@@ -1,11 +1,12 @@
 """ An interface to a database back-end for DRUIDs """
 
-import logmuse
+import copy
 import hashlib
 import jsonschema
 import logging
 import logmuse
 import sys
+import yacman
 
 from ubiquerg import VersionInHelpParser
 
@@ -35,9 +36,26 @@ class Henge(object):
             handle the digest of the serialized items stored in this henge.
         """
         self.database = database
-        self.schemas = schemas
         self.checksum_function = checksum_function
         self.digest_version = "md5"
+
+        if isinstance(schemas, dict):
+            _LOGGER.debug("Using old dict schemas")
+            populated_schemas = {}
+            for schema_key, schema_value in schemas.items():
+                if isinstance(schema_value, str):
+                    populated_schemas[schema_key] = yacman.load_yaml(schema_value)
+            self.schemas = populated_schemas
+        else:
+            populated_schemas = []
+            for schema_value in schemas:
+                if isinstance(schema_value, str):
+                    populated_schemas.append(yacman.load_yaml(schema_value))
+            split_schemas = {}
+            for s in populated_schemas:
+                split_schemas.update(split_schema(s))
+
+            self.schemas = split_schemas
 
         # Identify which henge to use for each item type. Default to self:
         self.henges = {}
@@ -66,8 +84,8 @@ class Henge(object):
             if "type" in schema and schema["type"] == "array":
                 return [reconstruct_item(substr, schema["items"], reclimit)
                         for substr in string.split(DELIM_ITEM)]
-            # if schema["type"] == "object":
-            else:  # assume it's an object
+            elif schema["type"] == "object":
+            #else:  # assume it's an object
                 attr_array = string.split(DELIM_ATTR)
                 item_reconstituted = dict(zip(schema['properties'].keys(),
                                               attr_array))
@@ -86,6 +104,20 @@ class Henge(object):
                                     reclimit,
                                     raw)                
                 return item_reconstituted
+            else: # it must be a primitive
+                if 'recursive' in schema:
+                    if isinstance(reclimit, int) and reclimit == 0:
+                        return string
+                    else:
+                        if isinstance(reclimit, int):
+                            reclimit = reclimit - 1
+                            print(string)
+                        return self.retrieve(string, reclimit, raw)
+                else:
+                    print("not recursive")
+                    print(schema)
+                    return string
+
 
         item_type = self.database[druid + ITEM_TYPE]
         _LOGGER.debug("item_type: {}".format(item_type))
@@ -152,14 +184,15 @@ class Henge(object):
                 return ""
 
         def build_attr_string(item, schema):
-
             if "type" in schema and schema["type"] == "array":
                 return DELIM_ITEM.join([build_attr_string(x, schema['items'])
                                         for x in item])
-            # if schema["type"] == "object":
-            else:  # assume it's an object
+            elif schema["type"] == "object" and 'properties' in schema:
+            #else:  # assume it's an object
                 return DELIM_ATTR.join([safestr(item, x) for x in
                                         list(schema['properties'].keys())])
+            else: #assume it's a primitive
+                return item
 
         valid_schema = self.schemas[item_type]
         # Add defaults here ?
@@ -222,6 +255,69 @@ class Henge(object):
         """
         for k, v in self.database.items():
             print(k, v)
+
+
+    def __repr__(self):
+        repr = "Henge object\n" + \
+        "Item types: " + ",".join(self.item_types) + "\n" + \
+        "Schemas: " + str(self.schemas)
+        return repr
+
+
+
+def split_schema(schema, name=None):
+    """
+    Splits a complete schema into components suitable for a Henge
+    """
+    slist = {}
+    # base case
+    if schema['type'] not in ['object', 'array']:
+        _LOGGER.debug(schema)
+        if name:
+            slist[name] = schema
+        elif 'henge_class' in schema:
+            slist[schema['henge_class']] = schema
+        _LOGGER.debug("Returning slist: {}".format(str(slist)))
+        return slist
+    else:
+        if schema['type'] == 'object':
+            if 'henge_class' in schema:
+                schema_copy = copy.deepcopy(schema)
+                _LOGGER.debug("adding " + str(schema_copy['henge_class']))
+                henge_class = schema_copy['henge_class']
+                del schema_copy['henge_class']
+                for p in schema_copy['properties']:
+                    if schema_copy['properties'][p]['type'] in ['object', 'array']:
+                        schema_copy['properties'][p] = {'type': "string"}
+                # del schema_copy['properties']
+                slist[henge_class] = schema_copy
+
+            for p in schema['properties']:
+                schema_sub = schema['properties'][p]
+                _LOGGER.debug("checking property:" + p)
+                slist.update(split_schema(schema['properties'][p]))
+
+        if schema['type'] == 'array':
+            _LOGGER.debug("found array")
+            if 'henge_class' in schema:
+                schema_copy = copy.deepcopy(schema)
+                print("adding", schema_copy['henge_class'])
+                henge_class = schema_copy['henge_class']
+                del schema_copy['henge_class']
+                schema_copy['items'] = {'type': "string"}
+                if 'recursive' in schema_copy:
+                    schema_copy['items']['recursive'] = True
+                # schema_copy['items']['type'] = "string"
+                # if 'properties' in schema_copy['items']:
+                #     del schema_copy['items']['properties']
+                slist[henge_class] = schema_copy
+
+            schema_sub = schema['items']
+            _LOGGER.debug("Checking item")
+            slist.update(split_schema(schema_sub))
+    return slist
+
+
 
 
 def connect_mongo(host='0.0.0.0', port=27017, database='henge_dict',
