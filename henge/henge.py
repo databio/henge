@@ -155,9 +155,65 @@ class Henge(object):
                 continue
         return valid_schemas
 
-    def insert(self, item, item_type=None):
+    def insert(self, item, item_type):
         """
-        Add items (of a specified type) the the database.
+        Add structured items of a specified type to the database.
+
+        :param list item: List of items to add.
+        :param str item_type: A string specifying the type of item. Must match
+            something from Henge.list_item_types. You can use
+            Henge.select_item_type to automatically choose this, if only one
+            fits.
+        """
+
+        
+        _LOGGER.debug("Item: {} / Type: {}".format(item, item_type))
+        
+        if item_type not in self.schemas.keys():
+            _LOGGER.error("I don't know about items of type '{}'. "
+                          "I know of: '{}'".format(item_type,
+                                                   list(self.schemas.keys())))
+            return False
+
+        schema = self.schemas[item_type]
+
+        if not schema:
+            return self.insert(item, item_type)
+
+        if schema['type'] == 'object':
+            flat_item = {}
+            for prop in item:
+                if prop in schema["properties"]:
+                    if "recursive" in schema and prop in schema["recursive"]:
+                        hclass = schema["properties"][prop]["henge_class"]
+                        _LOGGER.debug("Prop: {} / Hclass: {}".format(prop, hclass))
+                        digest = self.insert(item[prop], hclass)
+                        flat_item[prop] = digest
+                    else:
+                        flat_item[prop] = item[prop]
+                else:
+                    pass  # Ignore non-schema defined properties
+        elif schema['type'] == 'array':
+            flat_item = []
+            if schema['recursive']:
+                digest = []
+                hclass = schema['items']["henge_class"]
+                for element in item:
+                    digest.append(self.insert(element, hclass))
+                flat_item = digest
+            else:
+                flat_item = item
+
+        return self._insert_flat(flat_item, item_type)
+
+
+    def _insert_flat(self, item, item_type=None):
+        """
+        Add flattened items (of a specified type) to the database.
+
+        Flattened items have removed all levels, so it's only attributes and 
+        strict values; no nesting allowed. Use the upstream insert function
+        to insert full structured objects, which calls this function.
 
         :param list item: List of items to add.
         :param str item_type: A string specifying the type of item. Must match
@@ -264,7 +320,6 @@ class Henge(object):
         return repr
 
 
-
 def split_schema(schema, name=None):
     """
     Splits a hierarchical schema into flat components suitable for a Henge
@@ -284,10 +339,16 @@ def split_schema(schema, name=None):
             schema_copy = copy.deepcopy(schema)
             _LOGGER.debug("adding " + str(schema_copy['henge_class']))
             henge_class = schema_copy['henge_class']
-            del schema_copy['henge_class']
+            # del schema_copy['henge_class']
             for p in schema_copy['properties']:
+                hclass = None
+                if 'henge_class' in schema_copy['properties'][p]:
+                    hclass = schema_copy['properties'][p]['henge_class']
                 if schema_copy['properties'][p]['type'] in ['object', 'array']:
                     schema_copy['properties'][p] = {'type': "string"}
+                    if hclass:
+                        schema_copy['properties'][p]['henge_class'] = hclass
+                    # schema_copy['properties'][p]['type'] = "string"
             # del schema_copy['properties']
             slist[henge_class] = schema_copy
 
@@ -299,12 +360,14 @@ def split_schema(schema, name=None):
         _LOGGER.debug("found array")
         if 'henge_class' in schema:
             schema_copy = copy.deepcopy(schema)
-            print("adding", schema_copy['henge_class'])
+            _LOGGER.debug("adding", schema_copy['henge_class'])
             henge_class = schema_copy['henge_class']
-            del schema_copy['henge_class']
+            # del schema_copy['henge_class']
             schema_copy['items'] = {'type': "string"}
             if 'recursive' in schema_copy:
                 schema_copy['items']['recursive'] = True
+            if 'henge_class' in schema['items']:
+                schema_copy['items']['henge_class'] = schema['items']['henge_class']
             # schema_copy['items']['type'] = "string"
             # if 'properties' in schema_copy['items']:
             #     del schema_copy['items']['properties']
