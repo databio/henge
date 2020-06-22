@@ -267,7 +267,7 @@ class Henge(object):
 
 def split_schema(schema, name=None):
     """
-    Splits a complete schema into components suitable for a Henge
+    Splits a hierarchical schema into flat components suitable for a Henge
     """
     slist = {}
     # base case
@@ -279,42 +279,40 @@ def split_schema(schema, name=None):
             slist[schema['henge_class']] = schema
         _LOGGER.debug("Returning slist: {}".format(str(slist)))
         return slist
-    else:
-        if schema['type'] == 'object':
-            if 'henge_class' in schema:
-                schema_copy = copy.deepcopy(schema)
-                _LOGGER.debug("adding " + str(schema_copy['henge_class']))
-                henge_class = schema_copy['henge_class']
-                del schema_copy['henge_class']
-                for p in schema_copy['properties']:
-                    if schema_copy['properties'][p]['type'] in ['object', 'array']:
-                        schema_copy['properties'][p] = {'type': "string"}
-                # del schema_copy['properties']
-                slist[henge_class] = schema_copy
+    elif schema['type'] == 'object':
+        if 'henge_class' in schema:
+            schema_copy = copy.deepcopy(schema)
+            _LOGGER.debug("adding " + str(schema_copy['henge_class']))
+            henge_class = schema_copy['henge_class']
+            del schema_copy['henge_class']
+            for p in schema_copy['properties']:
+                if schema_copy['properties'][p]['type'] in ['object', 'array']:
+                    schema_copy['properties'][p] = {'type': "string"}
+            # del schema_copy['properties']
+            slist[henge_class] = schema_copy
 
-            for p in schema['properties']:
-                schema_sub = schema['properties'][p]
-                _LOGGER.debug("checking property:" + p)
-                slist.update(split_schema(schema['properties'][p]))
+        for p in schema['properties']:
+            schema_sub = schema['properties'][p]
+            _LOGGER.debug("checking property:" + p)
+            slist.update(split_schema(schema['properties'][p]))
+    elif schema['type'] == 'array':
+        _LOGGER.debug("found array")
+        if 'henge_class' in schema:
+            schema_copy = copy.deepcopy(schema)
+            print("adding", schema_copy['henge_class'])
+            henge_class = schema_copy['henge_class']
+            del schema_copy['henge_class']
+            schema_copy['items'] = {'type': "string"}
+            if 'recursive' in schema_copy:
+                schema_copy['items']['recursive'] = True
+            # schema_copy['items']['type'] = "string"
+            # if 'properties' in schema_copy['items']:
+            #     del schema_copy['items']['properties']
+            slist[henge_class] = schema_copy
 
-        if schema['type'] == 'array':
-            _LOGGER.debug("found array")
-            if 'henge_class' in schema:
-                schema_copy = copy.deepcopy(schema)
-                print("adding", schema_copy['henge_class'])
-                henge_class = schema_copy['henge_class']
-                del schema_copy['henge_class']
-                schema_copy['items'] = {'type': "string"}
-                if 'recursive' in schema_copy:
-                    schema_copy['items']['recursive'] = True
-                # schema_copy['items']['type'] = "string"
-                # if 'properties' in schema_copy['items']:
-                #     del schema_copy['items']['properties']
-                slist[henge_class] = schema_copy
-
-            schema_sub = schema['items']
-            _LOGGER.debug("Checking item")
-            slist.update(split_schema(schema_sub))
+        schema_sub = schema['items']
+        _LOGGER.debug("Checking item")
+        slist.update(split_schema(schema_sub))
     return slist
 
 
