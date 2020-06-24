@@ -5,8 +5,10 @@ import hashlib
 import jsonschema
 import logging
 import logmuse
+import os
 import sys
 import yacman
+import yaml
 
 from ubiquerg import VersionInHelpParser
 
@@ -14,6 +16,13 @@ from . import __version__
 from .const import *
 
 _LOGGER = logging.getLogger(__name__)
+
+class NotFoundException(Exception):
+    """Raised when a digest is not found"""
+    def __init__(self, m):
+        self.message = "{} not found in database".format(m)
+    def __str__(self):
+        return self.message
 
 
 def md5(seq):
@@ -28,7 +37,7 @@ class Henge(object):
 
         :param dict database: Dict-like lookup database for sequences and
             hashes.
-        :param dict schemas: One or more jsonschema schemas describing the
+        :param list schemas: One or more jsonschema schemas describing the
             data types stored by this Henge
         :param dict henges: One or more henge objects indexed by object name for
             remote storing of items.
@@ -50,7 +59,10 @@ class Henge(object):
             populated_schemas = []
             for schema_value in schemas:
                 if isinstance(schema_value, str):
-                    populated_schemas.append(yacman.load_yaml(schema_value))
+                    if os.path.isfile(schema_value):
+                        populated_schemas.append(yacman.load_yaml(schema_value))
+                    else:
+                        populated_schemas.append(yaml.safe_load(schema_value))
             split_schemas = {}
             for s in populated_schemas:
                 split_schemas.update(split_schema(s))
@@ -118,6 +130,8 @@ class Henge(object):
                     print(schema)
                     return string
 
+        if not druid + ITEM_TYPE in self.database:
+            raise NotFoundException(druid)
 
         item_type = self.database[druid + ITEM_TYPE]
         _LOGGER.debug("item_type: {}".format(item_type))
@@ -126,7 +140,7 @@ class Henge(object):
         try:
             string = henge_to_query.database[druid]
         except KeyError:
-            return "Not found"
+            raise NotFoundException(druid)
 
         schema = self.schemas[item_type]
         return reconstruct_item(string, schema, reclimit)

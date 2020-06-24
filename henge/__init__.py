@@ -5,6 +5,6 @@ from ._version import __version__
 from .henge import *
 
 __classes__ = ["Henge"]
-__all__ = __classes__ + ["connect_mongo", "split_schema"]
+__all__ = __classes__ + ["connect_mongo", "split_schema", "NotFoundException"]
 
 logmuse.init_logger("henge")
