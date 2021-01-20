@@ -1,0 +1,5 @@
+description: "An array of items."
+type: array
+items:
+  type: string
+

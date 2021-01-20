@@ -69,6 +69,9 @@ class Henge(object):
 
             self.schemas = split_schemas
 
+        # Default array object schema
+        self.schemas["array"] = {"type": "array", "recursive": True, "items": {"type": "string"}}
+
         # Identify which henge to use for each item type. Default to self:
         self.henges = {}
         for item_type in self.item_types:
@@ -80,6 +83,8 @@ class Henge(object):
                 if item_type not in self.item_types:
                     self.schemas[item_type] = henge.schemas[item_type]
                     self.henges[item_type] = henge
+
+
 
     def retrieve(self, druid, reclimit=None, raw=False):
         """
@@ -181,7 +186,7 @@ class Henge(object):
         """
 
         
-        _LOGGER.debug("Item: {} / Type: {}".format(item, item_type))
+        _LOGGER.debug("Insert item: {} / Type: {}".format(item, item_type))
         
         if item_type not in self.schemas.keys():
             _LOGGER.error("I don't know about items of type '{}'. "
@@ -194,22 +199,31 @@ class Henge(object):
         if not schema:
             return self.insert(item, item_type)
 
+        flat_item = None
         if schema['type'] == 'object':
             flat_item = {}
             for prop in item:
+                _LOGGER.debug("Considering prop {}".format(prop))
                 if prop in schema["properties"]:
                     if "recursive" in schema and prop in schema["recursive"]:
+                        _LOGGER.debug(str(schema["properties"][prop]))
                         hclass = schema["properties"][prop]["henge_class"]
                         _LOGGER.debug("Prop: {} / Hclass: {}".format(prop, hclass))
                         digest = self.insert(item[prop], hclass)
                         flat_item[prop] = digest
+                    elif schema["properties"][prop]["type"] in ['array']:
+                        _LOGGER.debug("Prop: {} / type array".format(prop))
+                        digest = self.insert(item[prop], "array")
+                        flat_item[prop] = digest
                     else:
+                        _LOGGER.debug("ELSE. not an array." + str(schema["properties"][prop]))
                         flat_item[prop] = item[prop]
+                    _LOGGER.debug("Prop: {}; Flat item: {}".format(prop, flat_item[prop]))
                 else:
                     pass  # Ignore non-schema defined properties
         elif schema['type'] == 'array':
             flat_item = []
-            if schema['recursive']:
+            if schema['recursive'] and 'henge_class' in schema['items']:
                 digest = []
                 hclass = schema['items']["henge_class"]
                 for element in item:
@@ -217,6 +231,10 @@ class Henge(object):
                 flat_item = digest
             else:
                 flat_item = item
+                _LOGGER.debug("Array flat item: {}".format(flat_item))
+        else:
+            _LOGGER.error("I don't understand this type!")
+            _LOGGER.debug(schema)
 
         return self._insert_flat(flat_item, item_type)
 
@@ -240,6 +258,8 @@ class Henge(object):
                           "I know of: '{}'".format(item_type,
                                                    list(self.schemas.keys())))
             return False
+
+        _LOGGER.debug("Insert flat item: {} / Type: {}".format(item, item_type))
 
         # digest_version should be automatically appended to the item by the
         # henge. if we can put a 'default' into the schema, then the henge
@@ -329,8 +349,7 @@ class Henge(object):
 
     def __repr__(self):
         repr = "Henge object\n" + \
-        "Item types: " + ",".join(self.item_types) + "\n" + \
-        "Schemas: " + str(self.schemas)
+        "Item types: " + ",".join(self.item_types) + "\n"
         return repr
 
 
@@ -358,7 +377,17 @@ def split_schema(schema, name=None):
                 hclass = None
                 if 'henge_class' in schema_copy['properties'][p]:
                     hclass = schema_copy['properties'][p]['henge_class']
-                if schema_copy['properties'][p]['type'] in ['object', 'array']:
+                if schema_copy['properties'][p]['type'] in ['object']:
+                    schema_copy['properties'][p] = {'type': "string"}
+                    if hclass:
+                        schema_copy['properties'][p]['henge_class'] = hclass
+                if schema_copy['properties'][p]['type'] in ["array"]:
+                    schema_copy['properties'][p] = {'type': "string"}
+                    if hclass:
+                        schema_copy['properties'][p]['henge_class'] = hclass
+                    else:
+                        schema_copy['properties'][p]['henge_class'] = "array"
+                if 'recursive' in schema_copy['properties'][p]:
                     schema_copy['properties'][p] = {'type': "string"}
                     if hclass:
                         schema_copy['properties'][p]['henge_class'] = hclass
@@ -372,13 +401,14 @@ def split_schema(schema, name=None):
             slist.update(split_schema(schema['properties'][p]))
     elif schema['type'] == 'array':
         _LOGGER.debug("found array")
+        _LOGGER.debug(schema)
         if 'henge_class' in schema:
             schema_copy = copy.deepcopy(schema)
-            _LOGGER.debug("adding", schema_copy['henge_class'])
+            _LOGGER.debug("adding " + str(schema['henge_class']))
             henge_class = schema_copy['henge_class']
             # del schema_copy['henge_class']
             schema_copy['items'] = {'type': "string"}
-            if 'recursive' in schema_copy:
+            if 'recursive' in schema_copy and schema_copy['recursive']:
                 schema_copy['items']['recursive'] = True
             if 'henge_class' in schema['items']:
                 schema_copy['items']['henge_class'] = schema['items']['henge_class']
@@ -386,10 +416,14 @@ def split_schema(schema, name=None):
             # if 'properties' in schema_copy['items']:
             #     del schema_copy['items']['properties']
             slist[henge_class] = schema_copy
+            schema_sub = schema['items']
+            slist.update(split_schema(schema_sub))
+        else:
+            _LOGGER.debug("Classless array")
+            _LOGGER.debug(schema)
+            slist.update(schema)
 
-        schema_sub = schema['items']
         _LOGGER.debug("Checking item")
-        slist.update(split_schema(schema_sub))
     return slist
 
 
