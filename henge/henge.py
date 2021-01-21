@@ -37,7 +37,7 @@ class Henge(object):
 
         :param dict database: Dict-like lookup database for sequences and
             hashes.
-        :param list schemas: One or more jsonschema schemas describing the
+        :param list schemas: A list of yaml files containing jsonschema schemas describing the
             data types stored by this Henge
         :param dict henges: One or more henge objects indexed by object name for
             remote storing of items.
@@ -62,6 +62,7 @@ class Henge(object):
                     if os.path.isfile(schema_value):
                         populated_schemas.append(yacman.load_yaml(schema_value))
                     else:
+                        _LOGGER.info("File not found...is this a direct schema?")
                         populated_schemas.append(yaml.safe_load(schema_value))
             split_schemas = {}
             for s in populated_schemas:
@@ -70,7 +71,8 @@ class Henge(object):
             self.schemas = split_schemas
 
         # Default array object schema
-        self.schemas["array"] = {"type": "array", "items": {"type": "string"}}
+        # I once wanted the array type to be built in, but now I don't.
+        # self.schemas["array"] = {"type": "array", "items": {"type": "string"}}
 
         # Identify which henge to use for each item type. Default to self:
         self.henges = {}
@@ -95,7 +97,6 @@ class Henge(object):
         :param bool raw: Return the value as a raw, henge-delimited string, instead
             of processing into a mapping. Default: False.
         """
-
         def reconstruct_item(string, schema, reclimit):
             if "type" in schema and schema["type"] == "array":
                 _LOGGER.debug("Lookup/array/Recursive: {}; Schema: {}".format(string, schema))
@@ -122,15 +123,19 @@ class Henge(object):
                                     raw)                
                 return item_reconstituted
             else: # it must be a primitive
+                # but it could be a primitive (string) that represents something to lookup,
+                # something not-to-lookup (or already looked up)
+                _LOGGER.debug("Lookup/prim: {}; Schema: {}".format(string, schema))
+                # return string
                 # if 'recursive' in schema:
-                if 'henge_class' in schema:
+                if 'henge_class' in schema and self.schemas[schema['henge_class']]['type'] in ['object', 'array']:
                     if isinstance(reclimit, int) and reclimit == 0:
                         _LOGGER.debug("Lookup/prim/Recursive-skip: {}; Schema: {}".format(string, schema))
                         return string
                     else:
                         if isinstance(reclimit, int):
                             reclimit = reclimit - 1
-                            _LOGGER.debug("Lookup/prim/Recursive: {}; Schema: {}".format(string, schema))
+                        _LOGGER.debug("Lookup/prim/Recursive: {}; Schema: {}".format(string, schema))
                         return self.retrieve(string, reclimit, raw)
                 else:
                     _LOGGER.debug("Lookup/prim/Non-recursive: {}; Schema: {}".format(string, schema))
@@ -149,6 +154,8 @@ class Henge(object):
             raise NotFoundException(druid)
 
         schema = self.schemas[item_type]
+        _LOGGER.debug("Got druid to retrieve: {} / item_type: {} / schema: {}".format(
+            druid, item_type, schema))
         return reconstruct_item(string, schema, reclimit)
 
     @property
@@ -187,7 +194,7 @@ class Henge(object):
         """
 
         
-        _LOGGER.debug("Insert item: {} / Type: {}".format(item, item_type))
+        _LOGGER.debug("Insert type: {} / Item: {}".format(item_type, item))
         
         if item_type not in self.schemas.keys():
             _LOGGER.error("I don't know about items of type '{}'. "
@@ -229,10 +236,11 @@ class Henge(object):
             else:
                 flat_item = item
                 _LOGGER.debug("Array flat item: {}".format(flat_item))
-        else:
-            _LOGGER.error("I don't understand this type!")
-            _LOGGER.debug(schema)
-
+        else: # A primitive type with a henge class
+            _LOGGER.debug("Nice! You're using a henge-classed primitive type!")
+            hclass = schema["henge_class"]
+            # digest = self.insert(item, hclass)
+            flat_item = item
         return self._insert_flat(flat_item, item_type)
 
 
@@ -255,8 +263,6 @@ class Henge(object):
                           "I know of: '{}'".format(item_type,
                                                    list(self.schemas.keys())))
             return False
-
-        _LOGGER.debug("Insert flat item: {} / Type: {}".format(item, item_type))
 
         # digest_version should be automatically appended to the item by the
         # henge. if we can put a 'default' into the schema, then the henge
@@ -295,7 +301,9 @@ class Henge(object):
         attr_string = build_attr_string(item, valid_schema)
         druid = self.checksum_function(attr_string)
         self._henge_insert(druid, attr_string, item_type)
-        _LOGGER.debug("Loaded {}".format(druid))
+
+        _LOGGER.debug("Inserted flat item. Digest: {} / Type: {} / Item: {}".format(
+            druid, item_type, item))
         return druid
 
     def _henge_insert(self, druid, string, item_type, digest_version=None):
@@ -312,7 +320,7 @@ class Henge(object):
         # henge?
 
         henge_to_query = self.henges[item_type]
-        _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
+        # _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
         try:
             henge_to_query.database[druid] = string
             henge_to_query.database[druid + ITEM_TYPE] = item_type
@@ -345,7 +353,7 @@ class Henge(object):
 
 
     def __repr__(self):
-        repr = "Henge object. Item types: " + ",".join(self.item_types) + "\n"
+        repr = "Henge object. Item types: " + ",".join(self.item_types)
         return repr
 
 
@@ -374,13 +382,14 @@ def split_schema(schema, name=None):
                 hclass = None
                 if 'henge_class' in schema_copy['properties'][p]:
                     hclass = schema_copy['properties'][p]['henge_class']
-                if schema_copy['properties'][p]['type'] in ['object']:
                     recursive_properties.append(p)
+                if schema_copy['properties'][p]['type'] in ['object']:
+                    # recursive_properties.append(p)
                     schema_copy['properties'][p] = {'type': "string"}
                     if hclass:
                         schema_copy['properties'][p]['henge_class'] = hclass
                 if schema_copy['properties'][p]['type'] in ["array"]:
-                    recursive_properties.append(p)
+                    # recursive_properties.append(p)
                     schema_copy['properties'][p] = {'type': "string"}
                     if hclass:
                         schema_copy['properties'][p]['henge_class'] = hclass

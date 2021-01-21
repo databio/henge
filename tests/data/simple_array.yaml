@@ -1,5 +1,6 @@
 description: "An array of items."
 type: array
+henge_class: array
 items:
   type: string
 
