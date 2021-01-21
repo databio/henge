@@ -1,0 +1,3 @@
+description: "Simple schema for a string"
+type: string
+henge_class: mystring

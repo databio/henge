@@ -14,6 +14,18 @@ h = henge.Henge(database={}, schemas=schemas)
 
 ```
 
+This keeps all database objects in memory. In case you want data persist across python sessions, you'll need to back that Dict with persistent storage. You can do this in many ways, here are two examples, using SQLite or MongoDB:
+
+## SQLite backend
+
+You can use an SQLite database like this
+
+```
+from sqlitedict import SqliteDict
+mydict = SqliteDict('./my_db.sqlite', autocommit=True)
+h = henge.Henge(mydict, schemas=schemas)
+```
+
 ## MongoDB backend
 
 If you want the data to persist, you need to connect `Henge` object to a running database instance, for example [MongoDB](https://www.mongodb.com/). Here are the example steps to do it:
@@ -44,3 +56,5 @@ schemas = {"sequence": yaml.safe_load(seq_schema), "asd": yaml.safe_load(asd),
 
 h = henge.Henge(henge.connect_mongo(), schemas=schemas)
 ```
+
+
