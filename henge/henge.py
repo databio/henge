@@ -28,6 +28,23 @@ class NotFoundException(Exception):
 def md5(seq):
     return hashlib.md5(seq.encode()).hexdigest()
 
+def is_url(maybe_url):
+    from urllib.parse import urlparse
+    return ' ' not in maybe_url and urlparse(maybe_url).scheme != ""
+
+def read_url(url):
+    _LOGGER.info("Reading URL: {}".format(url))
+    from urllib.request import urlopen
+    from urllib.error import HTTPError
+    try:
+        response = urlopen(url)
+    except HTTPError as e:
+        raise e
+    data = response.read()      # a `bytes` object
+    text = data.decode('utf-8')
+    print(text)
+    return yacman.safe_load(text)
+
 
 class Henge(object):
     def __init__(self, database, schemas, henges=None, 
@@ -62,7 +79,9 @@ class Henge(object):
                 if isinstance(schema_value, str):
                     if os.path.isfile(schema_value):
                         populated_schemas.append(yacman.load_yaml(schema_value))
-                    else:
+                    elif is_url(schema_value):
+                        populated_schemas.append(read_url(schema_value))
+                    else :
                         _LOGGER.info("File not found...is this a direct schema?")
                         populated_schemas.append(yaml.safe_load(schema_value))
             split_schemas = {}
