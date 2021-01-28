@@ -30,7 +30,8 @@ def md5(seq):
 
 
 class Henge(object):
-    def __init__(self, database, schemas, henges=None, checksum_function=md5):
+    def __init__(self, database, schemas, henges=None, 
+        checksum_function=md5):
         """
         A user interface to insert and retrieve decomposable recursive unique
         identifiers (DRUIDs).
@@ -141,11 +142,21 @@ class Henge(object):
                     _LOGGER.debug("Lookup/prim/Non-recursive: {}; Schema: {}".format(string, schema))
                     return string
 
-        if not druid + ITEM_TYPE in self.database:
-            raise NotFoundException(druid)
+        # This requires the database to have __iter__ defined...and it scrolls through
+        # not a great way, take it out! 2021-01 NS
+        # I'll instead do a try block
+        # if not druid + ITEM_TYPE in self.database:
+            # raise NotFoundException(druid)
 
-        item_type = self.database[druid + ITEM_TYPE]
-        henge_to_query = self.henges[item_type]
+        try:
+            item_type = self.database[druid + ITEM_TYPE]
+        except:
+            raise NotFoundException(druid)
+            
+        try:
+            henge_to_query = self.henges[item_type]
+        except:
+            raise NotFoundException(druid)
         # _LOGGER.debug("item_type: {}".format(item_type))
         # _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
         try:
@@ -182,7 +193,7 @@ class Henge(object):
                 continue
         return valid_schemas
 
-    def insert(self, item, item_type):
+    def insert(self, item, item_type, reclimit=None):
         """
         Add structured items of a specified type to the database.
 
@@ -204,35 +215,47 @@ class Henge(object):
 
         schema = self.schemas[item_type]
 
-        if not schema:
-            return self.insert(item, item_type)
 
-        flat_item = None
+        flat_item = item
         if schema['type'] == 'object':
             flat_item = {}
-            for prop in item:
-                if prop in schema["properties"]:
-                    _LOGGER.debug("-Prop {}; Schema: {}".format(prop, str(schema["properties"][prop])))
-                    if "recursive" in schema and prop in schema["recursive"]:
-                        hclass = schema["properties"][prop]["henge_class"]
-                        digest = self.insert(item[prop], hclass)
-                        flat_item[prop] = digest
-                    elif schema["properties"][prop]["type"] in ['array']:
-                        digest = self.insert(item[prop], "array")
-                        flat_item[prop] = digest
+            if isinstance(reclimit, int) and reclimit == 0:
+                return self._insert_flat(item, item_type)
+            else:
+                if isinstance(reclimit, int):
+                    reclimit = reclimit - 1
+                for prop in item:
+                    if prop in schema["properties"]:
+                        _LOGGER.debug("-Prop {}; Schema: {}".format(prop, str(schema["properties"][prop])))
+                        if "recursive" in schema and prop in schema["recursive"]:
+                            hclass = schema["properties"][prop]["henge_class"]
+                            digest = self.insert(item[prop], hclass, reclimit)
+                            flat_item[prop] = digest
+                        elif schema["properties"][prop]["type"] in ['array']:
+                            digest = self.insert(item[prop], "array", reclimit)
+                            flat_item[prop] = digest
+                        else:
+                            flat_item[prop] = item[prop]
+                        _LOGGER.debug("Prop: {}; Flat item: {}".format(prop, flat_item[prop]))
                     else:
-                        flat_item[prop] = item[prop]
-                    _LOGGER.debug("Prop: {}; Flat item: {}".format(prop, flat_item[prop]))
-                else:
-                    pass  # Ignore non-schema defined properties
+                        pass  # Ignore non-schema defined properties
+
+                # if len(flat_item) == 0:
+                #     flat_item = item
         elif schema['type'] == 'array':
             flat_item = []
             if 'henge_class' in schema['items']:
                 digest = []
                 hclass = schema['items']["henge_class"]
-                for element in item:
-                    digest.append(self.insert(element, hclass))
-                flat_item = digest
+                if isinstance(reclimit, int) and reclimit == 0:
+                    return self._insert_flat(item, item_type)
+                else:
+                    if isinstance(reclimit, int):
+                        reclimit = reclimit - 1                    
+                    _LOGGER.debug("Item: {}. Pyclass: {}. hclass: {}".format(item, type(item), hclass))
+                    for element in item:
+                        digest.append(self.insert(element, hclass, reclimit))
+                    flat_item = digest
             else:
                 flat_item = item
                 _LOGGER.debug("Array flat item: {}".format(flat_item))
@@ -241,6 +264,7 @@ class Henge(object):
             hclass = schema["henge_class"]
             # digest = self.insert(item, hclass)
             flat_item = item
+
         return self._insert_flat(flat_item, item_type)
 
 
@@ -292,11 +316,28 @@ class Henge(object):
         try: 
             jsonschema.validate(item, valid_schema)
         except jsonschema.ValidationError as e:
-            _LOGGER.error("Not valid data")
-            _LOGGER.error("Attempting to insert item: {}".format(item))
-            _LOGGER.error("Item type: {}".format(item_type))
+            _LOGGER.error("Not valid data. Item type: {}. Attempting to insert item: {}".
+                format(item_type, item))
             print(e)
-            return False
+
+            if isinstance(item, str):
+                henge_to_query = self.henges[item_type]
+                try:
+                    existing_item_type = henge_to_query.database[item + ITEM_TYPE]
+                except KeyError:
+                    _LOGGER.error("If you're trying to insert an item with druids, the sub-items must exist in the database.")
+                    # return None
+                try:
+                    existing_item = henge_to_query.database[item]
+                except KeyError:
+                    _LOGGER.error("That item wasn't in the database.")
+
+                # if (item_type == existing_item_type):
+                    # _LOGGER.info("But wait!!! That's already here, and it's great! I'll return that!")
+                return item
+
+            raise e
+            return None
             
         attr_string = build_attr_string(item, valid_schema)
         druid = self.checksum_function(attr_string)
@@ -318,6 +359,8 @@ class Henge(object):
         # interface henge or the henge where the storage actually occurs? it
         # MUST be in the interface henge; should it also be in the storage
         # henge?
+
+        # The storage henge may also be a read-only API...for some items...
 
         henge_to_query = self.henges[item_type]
         # _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
