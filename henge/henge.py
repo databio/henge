@@ -43,7 +43,7 @@ def read_url(url):
     data = response.read()      # a `bytes` object
     text = data.decode('utf-8')
     print(text)
-    return yacman.safe_load(text)
+    return yaml.safe_load(text)
 
 
 class Henge(object):
