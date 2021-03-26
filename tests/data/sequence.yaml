@@ -1,9 +1,3 @@
 description: "Schema for a single raw sequence"
-type: object
+type: string
 henge_class: sequence
-properties:
-  sequence:
-    type: string
-    description: "A sequence of characters"
-required:
-  - sequence
