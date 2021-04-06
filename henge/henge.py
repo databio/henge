@@ -109,6 +109,107 @@ class Henge(object):
 
 
     def retrieve(self, druid, reclimit=None, raw=False):
+
+        try:
+            item_type = self.database[druid + ITEM_TYPE]
+        except:
+            _LOGGER.debug(f"Item type not saved in database for {druid}")
+            raise NotFoundException(druid)
+            
+        # _LOGGER.debug("item_type: {}".format(item_type))
+        # _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
+
+        schema = self.schemas[item_type] #"type" in schema and 
+        # string = druid
+        _LOGGER.debug("Got druid to retrieve: {} / item_type: {} / schema: {}".format(
+            druid, item_type, schema))
+
+        if schema["type"] == "array":
+            string = self.lookup(druid, item_type)
+            _LOGGER.debug("Lookup/array/Recursive: {}; Schema: {}".format(string, schema))
+            splitstr = string.split(DELIM_ITEM)
+            # if self.flexible_digests:
+            #     pass
+            #     item_name = splitstr.pop(0)
+            if isinstance(reclimit, int) and reclimit == 0:  
+                return splitstr
+            if 'henge_class' in schema['items']:
+                _LOGGER.debug("Henge classed array: {}; Schema: {}".format(string, schema))
+                if isinstance(reclimit, int):
+                    reclimit = reclimit - 1                
+                return [self.retrieve(substr, reclimit) for substr in splitstr]
+            else:
+                return splitstr
+        elif schema["type"] == "object":
+            string = self.lookup(druid, item_type)
+            attr_array = string.split(DELIM_ATTR)
+            if self.flexible_digests:
+                keys = attr_array[::2]  # evens
+                vals = attr_array[1::2]  # odds
+                item_reconstituted = dict(zip(keys,vals))    
+            else:
+                item_reconstituted = dict(zip(schema['properties'].keys(),
+                                          attr_array))
+            # I think this part needs to be removed... it's based on the
+            # previous 'recursive' for arrays, which went away...
+            # but actually these may be added in by me, so nevermind.
+            if 'recursive' in schema:
+                if isinstance(reclimit, int) and reclimit == 0:
+                    _LOGGER.debug("Lookup/obj/Recursive: {}; Schema: {}".format(string, schema))
+                    return item_reconstituted
+                else:
+                    if isinstance(reclimit, int):
+                        reclimit = reclimit - 1
+                    for recursive_attr in schema['recursive']:                    
+                        if item_reconstituted[recursive_attr] \
+                                and item_reconstituted[recursive_attr] != "":
+                            item_reconstituted[recursive_attr] = self.retrieve(
+                                item_reconstituted[recursive_attr],
+                                reclimit,
+                                raw)                
+            return item_reconstituted
+        else: # It must be a primitive type
+            # but it could be a primitive (string) that represents something to lookup,
+            # or something not-to-lookup (or already looked up)
+            _LOGGER.debug("Lookup/prim: {}; Schema: {}".format(druid, schema))
+            # return string
+            if 'henge_class' in schema and self.schemas[schema['henge_class']]['type'] in ['object', 'array']:
+                if isinstance(reclimit, int) and reclimit == 0:
+                    _LOGGER.debug("Lookup/prim/Recursive-skip: {}; Schema: {}".format(string, schema))
+                    string = self.lookup(druid, item_type)
+                    return string
+                else:
+                    if isinstance(reclimit, int):
+                        reclimit = reclimit - 1
+                    _LOGGER.debug("Lookup/prim/Recursive: {}; Schema: {}".format(druid, schema))
+                    return self.retrieve(druid, reclimit, raw)
+            else:
+                string = self.lookup(druid, item_type)
+                _LOGGER.debug("Lookup/prim/Non-recursive: {}; Schema: {}".format(string, schema))
+                return string #self.retrieve(string, reclimit, raw)      
+
+        # try:
+        #     string = henge_to_query.database[druid]
+        # except KeyError:
+        #     raise NotFoundException(druid)
+
+        # return reconstruct_item(string, schema, reclimit)
+
+
+    def lookup(self, druid, item_type):
+        try:
+            henge_to_query = self.henges[item_type]
+        except:
+            _LOGGER.debug("No henges available for this item type")
+            raise NotFoundException(druid)        
+        try:
+            string = henge_to_query.database[druid]
+        except KeyError:
+            raise NotFoundException(druid)
+
+        return string
+
+    def retrieve2(self, druid, reclimit=None, raw=False):
         """
         Retrieve an item given a digest
 
@@ -125,7 +226,13 @@ class Henge(object):
                 # if self.flexible_digests:
                 #     pass
                 #     item_name = splitstr.pop(0)
-                return [reconstruct_item(substr, schema["items"], reclimit)
+                if 'henge_class' in schema['items'] and schema['items']['type'] not in ["object", "array"]:
+                    _LOGGER.debug("Henge classed array: {}; Schema: {}".format(string, schema))
+                    return "ASDF"
+                    return [reconstruct_item(self.henges[item_type].database[substr], schema["items"], reclimit)
+                        for substr in splitstr]
+                else:
+                    return [reconstruct_item(substr, schema["items"], reclimit)
                         for substr in splitstr]
             elif schema["type"] == "object":
                 attr_array = string.split(DELIM_ATTR)

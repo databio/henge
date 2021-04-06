@@ -15,8 +15,9 @@ properties:
     items:
       type: string
   array3:
-    description: "An array of items. Not henge-classed"
+    description: "An array of items. Items are henge-classed"
     type: array
-    henge_class: array
+    henge_class: array2
     items:
       type: string
+      henge_class: str
