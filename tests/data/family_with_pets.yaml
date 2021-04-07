@@ -14,6 +14,12 @@ properties:
     henge_class: array
     items:
       type: string
+  friends:
+    type: array
+    henge_class: friends_array
+    items:
+      type: string
+      henge_class: friend_string
   domicile:
     type: object
     henge_class: location
