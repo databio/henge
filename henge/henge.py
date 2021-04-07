@@ -161,7 +161,7 @@ class Henge(object):
                     if isinstance(reclimit, int):
                         reclimit = reclimit - 1
                     for recursive_attr in schema['recursive']:                    
-                        if item_reconstituted[recursive_attr] \
+                        if recursive_attr in item_reconstituted \
                                 and item_reconstituted[recursive_attr] != "":
                             item_reconstituted[recursive_attr] = self.retrieve(
                                 item_reconstituted[recursive_attr],
