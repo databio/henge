@@ -47,7 +47,7 @@ def read_url(url):
 
 
 class Henge(object):
-    def __init__(self, database, schemas, henges=None, 
+    def __init__(self, database, schemas, schemas_str=[], henges=None, 
         checksum_function=md5):
         """
         A user interface to insert and retrieve decomposable recursive unique
@@ -55,8 +55,9 @@ class Henge(object):
 
         :param dict database: Dict-like lookup database for sequences and
             hashes.
-        :param list schemas: A list of yaml files containing jsonschema schemas describing the
+        :param list schemas: A list of file paths containing YAML jsonschema schemas describing the
             data types stored by this Henge
+        :param list schemas_str: A list of strings containing YAML jsonschema schemas directly
         :param dict henges: One or more henge objects indexed by object name for
             remote storing of items.
         :param function(str) -> str checksum_function: Default function to
@@ -67,6 +68,11 @@ class Henge(object):
         self.digest_version = "md5"
         self.flexible_digests = True
 
+
+        # TODO: Right now you can pass a file, or a URL, or some yaml directly
+        # into the schemas param. I want to split that out so that at least the
+        # yaml direct is its own arg
+
         if isinstance(schemas, dict):
             _LOGGER.debug("Using old dict schemas")
             populated_schemas = {}
@@ -76,6 +82,9 @@ class Henge(object):
             self.schemas = populated_schemas
         else:
             populated_schemas = []
+            if isinstance(schemas, str):
+                _LOGGER.error("The schemas should be a list. Please pass a list of schemas")
+                schemas = [schemas]
             for schema_value in schemas:
                 if isinstance(schema_value, str):
                     if os.path.isfile(schema_value):
@@ -83,8 +92,12 @@ class Henge(object):
                     elif is_url(schema_value):
                         populated_schemas.append(read_url(schema_value))
                     else :
-                        _LOGGER.info("File not found...is this a direct schema?")
-                        populated_schemas.append(yaml.safe_load(schema_value))
+                        _LOGGER.error(f"Schema file not found: {schema_value}. Use schemas_str if you meant to specify a direct schema")
+                        # populated_schemas.append(yaml.safe_load(schema_value))
+
+            for schema_value in schemas_str:
+                populated_schemas.append(yaml.safe_load(schema_value))
+
             split_schemas = {}
             for s in populated_schemas:
                 split_schemas.update(split_schema(s))
@@ -643,11 +656,11 @@ def is_schema_recursive(schema):
     """
     # return 'recursive' in schema # old way
     is_recursive = False
-    if schema['type'] is "object":
+    if schema['type'] == "object":
         for prop in schema['properties']:
             if schema['properties']['prop']['type'] in ['object', 'array']:
                 return True
-    if schema['type'] is "array":        
+    if schema['type'] == "array":        
         if schema['items']['type'] in ['object', 'array']:
             return True
     return False
