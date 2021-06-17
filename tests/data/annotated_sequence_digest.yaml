@@ -1,4 +1,5 @@
 description: "Schema for an Annotated Sequence Digest; a digested Sequence plus metadata"
+henge_class: annotated_sequence_digest
 type: object
 properties:
   name:

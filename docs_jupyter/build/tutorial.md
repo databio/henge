@@ -580,7 +580,7 @@ required:
   - parents
 ```
 
-What's different here? First, we added an object property calle `pets` that is in array. This will demonstrate that henge handles nesting of arrays and properties.
+What's different here? First, we added an object property called `pets` that is in array. This will demonstrate that henge handles nesting of arrays and properties.
 
 Second, we added object properties that are simple primitive `string`, either with or without `henge_class` defined: `name` is a new property without a `henge_class`, which means this will *not* be stored as a first-class object in the database with it's own identifier. The `coordinates` property, like `name` is just a simple `string` property, but the difference is that it *is* listed with a `henge_class`. Therefore, it will get a unique identifier as it's own object type in the henge. We'll see below how this shows up in our object types.
 
