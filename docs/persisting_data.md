@@ -3,14 +3,12 @@
 In the simple case just use a Python `dict` object as `database`:
 
 ```python
+import henge
 seq_schema = "tests/data/sequence.yaml"
 asd = "tests/data/annotated_sequence_digest.yaml"
 acd = "tests/data/annotated_collection_digest.yaml"
 
-schemas = {"sequence": yaml.safe_load(seq_schema), "asd": yaml.safe_load(asd),
-            "acd": yaml.safe_load(acd)}
-
-h = henge.Henge(database={}, schemas=schemas)
+h = henge.Henge(database={}, schemas=[seq_schema, asd, acd])
 
 ```
 
@@ -23,7 +21,7 @@ You can use an SQLite database like this
 ```
 from sqlitedict import SqliteDict
 mydict = SqliteDict('./my_db.sqlite', autocommit=True)
-h = henge.Henge(mydict, schemas=schemas)
+h = henge.Henge(mydict, schemas=[seq_schema, asd, acd])
 ```
 
 ## MongoDB backend
@@ -51,8 +49,6 @@ Naturally, you need to have relevant packages installed.  In this case (for Mong
 
 ```python
 import henge
-schemas = {"sequence": yaml.safe_load(seq_schema), "asd": yaml.safe_load(asd),
-            "acd": yaml.safe_load(acd)}
 
 h = henge.Henge(henge.connect_mongo(), schemas=schemas)
 ```
