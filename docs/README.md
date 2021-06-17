@@ -2,13 +2,9 @@
 
 # Henge 
 
-Henge is a Python package that builds backends for generic decomposable recursive unique identifiers (or, *DRUIDs*). It was started as building block for sequence collections (see [`seqcol`](https://github.com/refgenie/seqcol)), but can also be used for other data types that need content-derived identifiers.
+Henge is a Python package for building data storage and retrieval interfaces for arbitrary data. Henge is based on the idea of decomposable recursive unique identifiers (or, *DRUIDs*), which are hash-based unique identifiers for data derived from the data itself. For arbitrary data with any structure, Henge can mint unique DRUIDs to identify data, store the data in a key-value database of your choice, and provide lookup functions to retrieve the data in its original structure using its druid identifier.
 
-Henge provides a way to store arbitrary data, defined with JSON-schema, and uses object-derived unique identifiers to retrieve the data. Henge provides 2 key advances:
-
-- decomposing: identifiers in henge will automatically retrieve tuples. These tuples can be tailored with a simple JSON schema document, so that henge can be used as a back-end for arbitrary data.
-
-- recursion: individual elements retrieved by the henge object can be tagged as recursive, which means these attributes contain their own DRUIDs. Henge can recurse through these.
+Henge was intended as a building block for sequence collections (see [the seqcol python package](https://github.com/refgenie/seqcol)), but has been made generic so that it can be used for data types that needs content-derived identifiers with database lookup capability.
 
 ## Install
 
@@ -18,14 +14,14 @@ pip install henge
 
 ## Basic use
 
-Create a Henge object by providing a database and a data schema. The database can be a Python dict or backed by persistent storage. Data schemas are JSON-schema formatted descriptions of data type, and can be hierarchical.
+Create a Henge object by providing a database and a data schema. The database can be a Python dict or backed by persistent storage. Data schemas are [JSON-schema](https://json-schema.org/) descriptions of data type, and can be hierarchical.
 
 ```python
-schemas = ...
+schemas = ["path/to/json_schema.yaml"]
 h = henge.Henge(database={}, schemas=schemas)
 ```
 
-Then you insert items into the henge. Upon insert, henge returns the druid (*aka* digest, checksum, unique identifier) for your object, which you can later use to retrieve it
+Then you insert items into the henge. Upon insert, henge returns the DRUID (*aka* digest, checksum, or unique identifier) for your object, which you can later use to retrieve it
 
 ```python
 object = ...  # produce the object of the type your henge understands
@@ -41,3 +37,11 @@ h.retrieve(druid)
 ```
 
 For more detailed example, consult the [tutorial](tutorial.md).
+
+## Decomposible Recursive Unique IDs (DRUIDs)
+
+DRUIDs are simply a special type of unique identifiers that have a few nice properties. A DRUID is ultimately the result of a digest operation (such as `md5` or `sha256`) on some data. What sets DRUIDs apart from a typical digest is that, when backed by a Henge, DRUIDS are *decomposable* and *recursive*:
+
+- decomposing: identifiers in henge will automatically retrieve tuples. These tuples can be tailored with a simple JSON schema document, so that henge can be used as a back-end for arbitrary data.
+
+- recursion: individual elements retrieved by the henge object can be tagged as recursive, which means these attributes contain their own DRUIDs. Henge can recurse through these, which allows us to mint unique identifiers for arbitrary nested data forms.

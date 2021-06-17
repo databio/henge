@@ -1,0 +1,23 @@
+description: "A collection of arrays"
+type: object
+henge_class: arrayset
+properties:
+  array1:
+    description: "An array of items."
+    type: array
+    henge_class: array
+    items:
+      type: string
+  array2:
+    description: "An array of items."
+    type: array
+    henge_class: array
+    items:
+      type: string
+  array3:
+    description: "An array of items. Items are henge-classed"
+    type: array
+    henge_class: array2
+    items:
+      type: string
+      henge_class: str

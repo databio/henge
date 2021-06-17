@@ -2,11 +2,33 @@ description: "Family"
 type: object
 henge_class: family
 properties:
+  name:
+    type: string
+    description: "Name of the family."
+  coordinates:
+    type: string
+    henge_class: "recprim"
+    description: "A recursive primitive"
+  pets:
+    type: array
+    henge_class: array
+    items:
+      type: string
+  friends:
+    type: array
+    henge_class: friends_array
+    items:
+      type: string
+      henge_class: friend_string
   domicile:
     type: object
     henge_class: location
     properties:
       address:
+        type: string
+      state:
+        type: string
+      city:
         type: string
   parents:
     type: array
