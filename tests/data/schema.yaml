@@ -1,4 +1,6 @@
 description: "Schema1"
+henge_class: test_item
+type: object
 properties:
   string_attr:
     type: string

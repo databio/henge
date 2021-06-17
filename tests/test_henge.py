@@ -1,6 +1,6 @@
 import pytest
 from henge import Henge
-
+from jsonschema import ValidationError
 
 class TestInserting:
     @pytest.mark.parametrize(["x", "success"], [
@@ -14,13 +14,15 @@ class TestInserting:
     ])
     def test_insert_validation_works(self, schema, x, success):
         """ Test whether insertion is performed only for valid objects """
-        type_key = "schema"
-        h = Henge(database={}, schemas={type_key: schema})
+        type_key = "test_item"
+        print("here's what I got for schema:")
+        print(schema)
+        h = Henge(database={}, schemas=["tests/data/schema.yaml"])
         if success:
             assert isinstance(h.insert(x, item_type=type_key), str)
         else:
-            assert isinstance(h.insert(x, item_type=type_key), bool)
-            assert not h.insert(x, item_type=type_key)
+            with pytest.raises(ValidationError):
+                h.insert(x, item_type=type_key)
 
 
 class TestRetrieval:
@@ -30,31 +32,22 @@ class TestRetrieval:
         ({"string_attr": "string"})
     ])
     def test_retrieve_returns_inserted_obj(self, schema, x):
-        type_key = "schema"
-        h = Henge(database={}, schemas={type_key: schema})
+        type_key = "test_item"
+        h = Henge(database={}, schemas=["tests/data/schema.yaml"])
         d = h.insert(x, item_type=type_key)
         # returns str versions of inserted data
-        if len(x) > 1:
-            assert h.retrieve(d) == {k: str(v) for k, v in x.items()}
-        else:
-            assert not h.retrieve(d) == {k: str(v) for k, v in x.items()}
+        assert h.retrieve(d) == {k: str(v) for k, v in x.items()}
 
     @pytest.mark.parametrize(["seq", "anno"], [
-        ({"sequence": "ATGCAGTA"},
+        ("ATGCAGTA",
          {"name": "seq1", "length": 10, "topology": "linear"}),
-        ({"sequence": "AAAAAAAA"},
+        ("AAAAAAAA",
          {"name": "seq2", "length": 11, "topology": "linear"})
     ])
     def test_retrieve_recurses(self, schema_asd, schema_sequence, seq, anno):
-        h = Henge(database={}, schemas={"sequence": schema_sequence,
-                                        "ASD": schema_asd})
+        h = Henge(database={}, schemas=["tests/data/sequence.yaml", "tests/data/annotated_sequence_digest.yaml"])
         seq_digest = h.insert(seq, item_type="sequence")
         anno.update({"sequence_digest": seq_digest})
-        asd = h.insert(anno, item_type="ASD")
+        asd = h.insert(anno, item_type="annotated_sequence_digest")
         res = h.retrieve(asd)
-        assert isinstance(res["sequence_digest"], dict)
-        assert isinstance(res["sequence_digest"]["sequence"], str)
-        assert res["sequence_digest"]["sequence"] == seq["sequence"]
-        res = h.retrieve(asd, reclimit=0)
-        assert isinstance(res["sequence_digest"], str)
-        assert res["sequence_digest"] == seq_digest
+        assert isinstance(res["name"], str)
