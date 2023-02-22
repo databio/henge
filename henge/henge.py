@@ -125,6 +125,12 @@ class Henge(object):
         item_type = self.database[druid + ITEM_TYPE]
         digested_string = self.lookup(druid, item_type)
         reconstructed_item = json.loads(digested_string)
+
+        external_string = self.database[druid + "_external_string"]
+        if external_string != "null":
+            external_values = json.loads(external_string)
+            reconstructed_item.update(external_values)
+
         schema = self.schemas[item_type]
         
         if schema["type"] == "array":
@@ -146,7 +152,7 @@ class Henge(object):
                     for recursive_attr in schema['recursive']:                    
                         if recursive_attr in reconstructed_item \
                                 and reconstructed_item[recursive_attr] != "":
-                            reconstructed_item[recursive_attr] = self.retrieve3(
+                            reconstructed_item[recursive_attr] = self.retrieve(
                                 reconstructed_item[recursive_attr],
                                 reclimit,
                                 raw)     
@@ -541,7 +547,7 @@ class Henge(object):
             return None
         
 
-        item_inherent_split = select_inherent_properties(item, item_type, valid_schema)
+        item_inherent_split = select_inherent_properties(item, valid_schema)
         attr_string = canonical_str(item_inherent_split["inherent"])
         external_string = canonical_str(item_inherent_split["external"])
 
@@ -691,16 +697,19 @@ def canonical_str(item: dict) -> str:
     """ Convert a dict into a canonical string representation """
     return json.dumps(item, separators=(',', ':'), ensure_ascii=False, allow_nan=False, sort_keys=True) 
 
-def select_inherent_properties(item: dict, item_type: str, schema: dict) -> dict:
-    if item_type == "object":
+def select_inherent_properties(item: dict, schema: dict) -> dict:
+    if schema["type"] == "object":
         item_inherent = {}
         if "inherent" in schema and schema["inherent"]:
             for k in schema["inherent"]:
                 item_inherent[k] = item[k]
                 del item[k]
             return {"inherent": item_inherent, "external": item}
+        else:
+            return {"inherent": item, "external": None}
     else:
         return {"inherent": item, "external": None}
+
 
 
 def is_schema_recursive(schema):
