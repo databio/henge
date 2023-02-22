@@ -121,6 +121,37 @@ class Henge(object):
                     self.henges[item_type] = henge
 
 
+    def retrieve3(self, druid, reclimit=None, raw=False):
+        item_type = self.database[druid + ITEM_TYPE]
+        digested_string = self.lookup(druid, item_type)
+        reconstructed_item = json.loads(digested_string)
+        schema = self.schemas[item_type]
+        
+        if schema["type"] == "array":
+            if isinstance(reclimit, int) and reclimit == 0:  
+                return reconstructed_item
+            if 'henge_class' in schema['items']:
+                _LOGGER.debug("Henge classed array: {}; Schema: {}".format(string, schema))
+                if isinstance(reclimit, int):
+                    reclimit = reclimit - 1                
+                return [self.retrieve3(item, reclimit) for item in reconstructed_item]
+        elif schema["type"] == "object":
+            if 'recursive' in schema:
+                if isinstance(reclimit, int) and reclimit == 0:
+                    _LOGGER.debug("Lookup/obj/Recursive: {}; Schema: {}".format(string, schema))
+                    return reconstructed_item
+                else:
+                    if isinstance(reclimit, int):
+                        reclimit = reclimit - 1
+                    for recursive_attr in schema['recursive']:                    
+                        if recursive_attr in reconstructed_item \
+                                and reconstructed_item[recursive_attr] != "":
+                            reconstructed_item[recursive_attr] = self.retrieve3(
+                                reconstructed_item[recursive_attr],
+                                reclimit,
+                                raw)     
+        return reconstructed_item
+
     def retrieve(self, druid, reclimit=None, raw=False):
 
         try:
@@ -509,7 +540,7 @@ class Henge(object):
             raise e
             return None
             
-        attr_string = build_attr_string(item, valid_schema)
+        attr_string = canonical_str(item)
 
         _LOGGER.debug(f"String to digest: {attr_string}")
         druid = self.checksum_function(attr_string)
@@ -649,6 +680,11 @@ def split_schema(schema, name=None):
         _LOGGER.debug("Checking item")
     return slist
 
+
+import json
+def canonical_str(item: dict) -> str:
+    """ Convert a dict into a canonical string representation """
+    return json.dumps(item, separators=(',', ':'), ensure_ascii=False, allow_nan=False, sort_keys=True) 
 
 def is_schema_recursive(schema):
     """
