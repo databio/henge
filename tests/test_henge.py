@@ -2,6 +2,8 @@ import pytest
 from henge import Henge
 from jsonschema import ValidationError
 
+# See conftest.py for fixtures
+
 class TestInserting:
     @pytest.mark.parametrize(["x", "success"], [
         ({"string_attr": "12321%@!"}, True),
@@ -15,8 +17,7 @@ class TestInserting:
     def test_insert_validation_works(self, schema, x, success):
         """ Test whether insertion is performed only for valid objects """
         type_key = "test_item"
-        print("here's what I got for schema:")
-        print(schema)
+        print(f"here's what I got for schema: {schema}")
         h = Henge(database={}, schemas=["tests/data/schema.yaml"])
         if success:
             assert isinstance(h.insert(x, item_type=type_key), str)
@@ -36,7 +37,7 @@ class TestRetrieval:
         h = Henge(database={}, schemas=["tests/data/schema.yaml"])
         d = h.insert(x, item_type=type_key)
         # returns str versions of inserted data
-        assert h.retrieve(d) == {k: str(v) for k, v in x.items()}
+        assert h.retrieve(d) == {k: v for k, v in x.items()}
 
     @pytest.mark.parametrize(["seq", "anno"], [
         ("ATGCAGTA",
@@ -51,3 +52,7 @@ class TestRetrieval:
         asd = h.insert(anno, item_type="annotated_sequence_digest")
         res = h.retrieve(asd)
         assert isinstance(res["name"], str)
+
+
+    def test_inherent_attributes(self, inherent):
+        print("test")

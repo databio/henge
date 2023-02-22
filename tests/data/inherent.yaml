@@ -1,0 +1,14 @@
+description: "Schema1"
+henge_class: test_item
+type: object
+properties:
+  string_attr:
+    type: string
+    description: "String attribute"
+  integer_attr:
+    type: integer
+    description: "Integer attribute"
+required:
+  - string_attr
+inherent:
+  - string_attr

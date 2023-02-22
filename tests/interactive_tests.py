@@ -1,7 +1,7 @@
 import henge
 
 from platform import python_version 
-import henge
+
 print("Python version: {}; henge version: {}".format(python_version(), henge.__version__))
 
 !cat "tests/data/string.yaml" 
@@ -34,6 +34,8 @@ arrhenge.retrieve(digest)
 arrhenge.retrieve2(digest)
 arrhenge.retrieve3(digest)
 
+
+import henge
 famhenge = henge.Henge(database={}, schemas=["tests/data/family.yaml"])
 myfam = {'domicile': '',
  'parents': [{'name': 'Pat', 'age': 38}, {'name': 'Kelly', 'age': 35}],
@@ -47,3 +49,13 @@ famhenge.retrieve(myfam_druid)
 famhenge.retrieve2(myfam_druid)
 famhenge.retrieve3(myfam_druid)
 
+famhenge.retrieve3(myfam_druid, reclimit=3)
+
+
+from henge import Henge
+x = {"string_attr": "12321%@!", "integer_attr": 2}
+type_key = "test_item"
+h = Henge(database={}, schemas=["tests/data/schema.yaml"])
+d = h.insert(x, item_type=type_key)
+h.retrieve(d)
+x
