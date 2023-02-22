@@ -67,7 +67,7 @@ class Henge(object):
         self.checksum_function = checksum_function
         self.digest_version = "md5"
         self.flexible_digests = True
-
+        self.supports_inherent_attrs = True
 
         # TODO: Right now you can pass a file, or a URL, or some yaml directly
         # into the schemas param. I want to split that out so that at least the
@@ -140,7 +140,7 @@ class Henge(object):
                 _LOGGER.debug("Henge classed array: {}; Schema: {}".format(digested_string, schema))
                 if isinstance(reclimit, int):
                     reclimit = reclimit - 1                
-                return [self.retrieve3(item, reclimit) for item in reconstructed_item]
+                return [self.retrieve(item, reclimit) for item in reconstructed_item]
         elif schema["type"] == "object":
             if 'recursive' in schema:
                 if isinstance(reclimit, int) and reclimit == 0:
