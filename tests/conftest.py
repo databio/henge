@@ -33,6 +33,7 @@ def schema_asd(data_path):
 def schema_acd(data_path):
     return load_yaml_for_test("annotated_collection_digest.yaml", data_path)
 
+
 @pytest.fixture
 def inherent(data_path):
     return load_yaml_for_test("inherent.yaml", data_path)
