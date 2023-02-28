@@ -4,7 +4,6 @@ import copy
 import hashlib
 import jsonschema
 import logging
-import logmuse
 import json
 import os
 import sys
