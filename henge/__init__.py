@@ -1,6 +1,5 @@
-# Project configuration, particularly for logging.
+# Project configuration.
 
-import logmuse
 from ._version import __version__
 from .henge import *
 
@@ -11,5 +10,3 @@ __all__ = __classes__ + [
     "NotFoundException",
     "canonical_str",
 ]
-
-logmuse.init_logger("henge", propagate=True)
