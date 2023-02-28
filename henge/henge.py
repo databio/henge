@@ -251,6 +251,7 @@ class Henge(object):
                             flat_item[prop] = item[prop]
                         _LOGGER.debug("Prop: {}; Flat item: {}".format(prop, flat_item[prop]))
                     else:
+                        _LOGGER.debug(f"Prop: {prop}. Ignoring due to not in schema")
                         pass  # Ignore non-schema defined properties
 
                 # if len(flat_item) == 0:
@@ -335,11 +336,13 @@ class Henge(object):
             raise e
             return None
         
+        _LOGGER.debug(f"item to insert: {item}")        
         item_inherent_split = select_inherent_properties(item, valid_schema)
         attr_string = canonical_str(item_inherent_split["inherent"])
         external_string = canonical_str(item_inherent_split["external"])
 
         _LOGGER.debug(f"String to digest: {attr_string}")
+        _LOGGER.debug(f"External string: {external_string}")
         druid = self.checksum_function(attr_string)
         self._henge_insert(druid, attr_string, item_type, external_string)
 
@@ -380,13 +383,16 @@ class Henge(object):
         """
         Remove all items from this database.
         """
-        for k, v in self.database.items():
-            try:
-                del self.database[k]
-                del self.database[k + ITEM_TYPE]
-                del self.database[k + "_digest_version"]
-            except (KeyError, AttributeError):
-                pass
+        try:
+            for k, v in self.database.items():
+                try:
+                    del self.database[k]
+                    del self.database[k + ITEM_TYPE]
+                    del self.database[k + "_digest_version"]
+                except (KeyError, AttributeError):
+                    pass
+        except AttributeError as e:
+            _LOGGER.warn(f"Error trying to iterate over database items: {e}")                   
 
     def show(self):
         """

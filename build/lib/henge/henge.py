@@ -5,6 +5,7 @@ import hashlib
 import jsonschema
 import logging
 import logmuse
+import json
 import os
 import sys
 import yacman
@@ -67,7 +68,7 @@ class Henge(object):
         self.checksum_function = checksum_function
         self.digest_version = "md5"
         self.flexible_digests = True
-
+        self.supports_inherent_attrs = True
 
         # TODO: Right now you can pass a file, or a URL, or some yaml directly
         # into the schemas param. I want to split that out so that at least the
@@ -121,10 +122,25 @@ class Henge(object):
                     self.henges[item_type] = henge
 
 
-    def retrieve3(self, druid, reclimit=None, raw=False):
+    def retrieve(self, druid, reclimit=None, raw=False):
+        """
+        Retrieve an item given a digest
+
+        :param str druid: The Decomposable recursive unique identifier (DRUID), or
+            digest that uniquely identifies that item to retrieve.
+        :param int reclimit: Recursion limit. Set to None for no limit (default).
+        :param bool raw: Return the value as a raw, henge-delimited string, instead
+            of processing into a mapping. Default: False.
+        """
         item_type = self.database[druid + ITEM_TYPE]
         digested_string = self.lookup(druid, item_type)
         reconstructed_item = json.loads(digested_string)
+
+        external_string = self.database[druid + "_external_string"]
+        if external_string != "null":
+            external_values = json.loads(external_string)
+            reconstructed_item.update(external_values)
+
         schema = self.schemas[item_type]
         
         if schema["type"] == "array":
@@ -134,7 +150,7 @@ class Henge(object):
                 _LOGGER.debug("Henge classed array: {}; Schema: {}".format(digested_string, schema))
                 if isinstance(reclimit, int):
                     reclimit = reclimit - 1                
-                return [self.retrieve3(item, reclimit) for item in reconstructed_item]
+                return [self.retrieve(item, reclimit) for item in reconstructed_item]
         elif schema["type"] == "object":
             if 'recursive' in schema:
                 if isinstance(reclimit, int) and reclimit == 0:
@@ -146,99 +162,11 @@ class Henge(object):
                     for recursive_attr in schema['recursive']:                    
                         if recursive_attr in reconstructed_item \
                                 and reconstructed_item[recursive_attr] != "":
-                            reconstructed_item[recursive_attr] = self.retrieve3(
+                            reconstructed_item[recursive_attr] = self.retrieve(
                                 reconstructed_item[recursive_attr],
                                 reclimit,
                                 raw)     
         return reconstructed_item
-
-    def retrieve(self, druid, reclimit=None, raw=False):
-
-        try:
-            item_type = self.database[druid + ITEM_TYPE]
-        except:
-            _LOGGER.debug(f"Item type not saved in database for {druid}")
-            raise NotFoundException(druid)
-            
-        # _LOGGER.debug("item_type: {}".format(item_type))
-        # _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
-
-        schema = self.schemas[item_type] #"type" in schema and 
-        # string = druid
-        _LOGGER.debug("Got druid to retrieve: {} / item_type: {} / schema: {}".format(
-            druid, item_type, schema))
-
-        if schema["type"] == "array":
-            string = self.lookup(druid, item_type)
-            _LOGGER.debug("Lookup/array/Recursive: {}; Schema: {}".format(string, schema))
-            splitstr = string.split(DELIM_ITEM)
-            # if self.flexible_digests:
-            #     pass
-            #     item_name = splitstr.pop(0)
-            if isinstance(reclimit, int) and reclimit == 0:  
-                return splitstr
-            if 'henge_class' in schema['items']:
-                _LOGGER.debug("Henge classed array: {}; Schema: {}".format(string, schema))
-                if isinstance(reclimit, int):
-                    reclimit = reclimit - 1                
-                return [self.retrieve(substr, reclimit) for substr in splitstr]
-            else:
-                return splitstr
-        elif schema["type"] == "object":
-            string = self.lookup(druid, item_type)
-            attr_array = string.split(DELIM_ATTR)
-            if self.flexible_digests:
-                keys = attr_array[::2]  # evens
-                vals = attr_array[1::2]  # odds
-                item_reconstituted = dict(zip(keys,vals))    
-            else:
-                item_reconstituted = dict(zip(schema['properties'].keys(),
-                                          attr_array))
-            # I think this part needs to be removed... it's based on the
-            # previous 'recursive' for arrays, which went away...
-            # but actually these may be added in by me, so nevermind.
-            if 'recursive' in schema:
-                if isinstance(reclimit, int) and reclimit == 0:
-                    _LOGGER.debug("Lookup/obj/Recursive: {}; Schema: {}".format(string, schema))
-                    return item_reconstituted
-                else:
-                    if isinstance(reclimit, int):
-                        reclimit = reclimit - 1
-                    for recursive_attr in schema['recursive']:                    
-                        if recursive_attr in item_reconstituted \
-                                and item_reconstituted[recursive_attr] != "":
-                            item_reconstituted[recursive_attr] = self.retrieve(
-                                item_reconstituted[recursive_attr],
-                                reclimit,
-                                raw)                
-            return item_reconstituted
-        else: # It must be a primitive type
-            # but it could be a primitive (string) that represents something to lookup,
-            # or something not-to-lookup (or already looked up)
-            _LOGGER.debug("Lookup/prim: {}; Schema: {}".format(druid, schema))
-            # return string
-            if 'henge_class' in schema and self.schemas[schema['henge_class']]['type'] in ['object', 'array']:
-                if isinstance(reclimit, int) and reclimit == 0:
-                    _LOGGER.debug("Lookup/prim/Recursive-skip: {}; Schema: {}".format(string, schema))
-                    string = self.lookup(druid, item_type)
-                    return string
-                else:
-                    if isinstance(reclimit, int):
-                        reclimit = reclimit - 1
-                    _LOGGER.debug("Lookup/prim/Recursive: {}; Schema: {}".format(druid, schema))
-                    return self.retrieve(druid, reclimit, raw)
-            else:
-                string = self.lookup(druid, item_type)
-                _LOGGER.debug("Lookup/prim/Non-recursive: {}; Schema: {}".format(string, schema))
-                return string #self.retrieve(string, reclimit, raw)      
-
-        # try:
-        #     string = henge_to_query.database[druid]
-        # except KeyError:
-        #     raise NotFoundException(druid)
-
-        # return reconstruct_item(string, schema, reclimit)
-
 
     def lookup(self, druid, item_type):
         try:
@@ -253,105 +181,7 @@ class Henge(object):
 
         return string
 
-    def retrieve2(self, druid, reclimit=None, raw=False):
-        """
-        Retrieve an item given a digest
-
-        :param str druid: The Decomposable recursive unique identifier (DRUID), or
-            digest that uniquely identifies that item to retrieve.
-        :param int reclimit: Recursion limit. Set to None for no limit (default).
-        :param bool raw: Return the value as a raw, henge-delimited string, instead
-            of processing into a mapping. Default: False.
-        """
-        def reconstruct_item(string, schema, reclimit):
-            if "type" in schema and schema["type"] == "array":
-                _LOGGER.debug("Lookup/array/Recursive: {}; Schema: {}".format(string, schema))
-                splitstr = string.split(DELIM_ITEM)
-                # if self.flexible_digests:
-                #     pass
-                #     item_name = splitstr.pop(0)
-                if 'henge_class' in schema['items'] and schema['items']['type'] not in ["object", "array"]:
-                    _LOGGER.debug("Henge classed array: {}; Schema: {}".format(string, schema))
-                    return "ASDF"
-                    return [reconstruct_item(self.henges[item_type].database[substr], schema["items"], reclimit)
-                        for substr in splitstr]
-                else:
-                    return [reconstruct_item(substr, schema["items"], reclimit)
-                        for substr in splitstr]
-            elif schema["type"] == "object":
-                attr_array = string.split(DELIM_ATTR)
-                if self.flexible_digests:
-                    keys = attr_array[::2]  # evens
-                    vals = attr_array[1::2]  # odds
-                    item_reconstituted = dict(zip(keys,vals))    
-                else:
-                    item_reconstituted = dict(zip(schema['properties'].keys(),
-                                              attr_array))
-                # I think this part needs to be removed... it's based on the
-                # previous 'recursive' for arrays, which went away...
-                # but actually these may be added in by me, so nevermind.
-                if 'recursive' in schema:
-                    if isinstance(reclimit, int) and reclimit == 0:
-                        _LOGGER.debug("Lookup/obj/Recursive: {}; Schema: {}".format(string, schema))
-                        return item_reconstituted
-                    else:
-                        if isinstance(reclimit, int):
-                            reclimit = reclimit - 1
-                        for recursive_attr in schema['recursive']:                    
-                            if item_reconstituted[recursive_attr] \
-                                    and item_reconstituted[recursive_attr] != "":
-                                item_reconstituted[recursive_attr] = self.retrieve(
-                                    item_reconstituted[recursive_attr],
-                                    reclimit,
-                                    raw)                
-                return item_reconstituted
-            else: # it must be a primitive
-                # but it could be a primitive (string) that represents something to lookup,
-                # or something not-to-lookup (or already looked up)
-                _LOGGER.debug("Lookup/prim: {}; Schema: {}".format(string, schema))
-                # return string
-                if 'henge_class' in schema and self.schemas[schema['henge_class']]['type'] in ['object', 'array']:
-                    if isinstance(reclimit, int) and reclimit == 0:
-                        _LOGGER.debug("Lookup/prim/Recursive-skip: {}; Schema: {}".format(string, schema))
-                        return string
-                    else:
-                        if isinstance(reclimit, int):
-                            reclimit = reclimit - 1
-                        _LOGGER.debug("Lookup/prim/Recursive: {}; Schema: {}".format(string, schema))
-                        return self.retrieve(string, reclimit, raw)
-                else:
-                    _LOGGER.debug("Lookup/prim/Non-recursive: {}; Schema: {}".format(string, schema))
-                    return string
-
-        # This requires the database to have __iter__ defined...and it scrolls through
-        # not a great way, take it out! 2021-01 NS
-        # I'll instead do a try block
-        # if not druid + ITEM_TYPE in self.database:
-            # raise NotFoundException(druid)
-
-        try:
-            item_type = self.database[druid + ITEM_TYPE]
-        except:
-            _LOGGER.debug(f"Item type not saved in database for {druid}")
-            raise NotFoundException(druid)
-            
-        try:
-            henge_to_query = self.henges[item_type]
-        except:
-            _LOGGER.debug("No henges available for this item type")
-            raise NotFoundException(druid)
-        # _LOGGER.debug("item_type: {}".format(item_type))
-        # _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
-        try:
-            string = henge_to_query.database[druid]
-        except KeyError:
-            raise NotFoundException(druid)
-
-        schema = self.schemas[item_type]
-        _LOGGER.debug("Got druid to retrieve: {} / item_type: {} / schema: {}".format(
-            druid, item_type, schema))
-        return reconstruct_item(string, schema, reclimit)
-
+ 
     @property
     def item_types(self):
         """
@@ -421,6 +251,7 @@ class Henge(object):
                             flat_item[prop] = item[prop]
                         _LOGGER.debug("Prop: {}; Flat item: {}".format(prop, flat_item[prop]))
                     else:
+                        _LOGGER.debug(f"Prop: {prop}. Ignoring due to not in schema")
                         pass  # Ignore non-schema defined properties
 
                 # if len(flat_item) == 0:
@@ -447,9 +278,6 @@ class Henge(object):
             hclass = schema["henge_class"]
             # digest = self.insert(item, hclass)
             flat_item = item
-
-
-
 
         return self._insert_flat(flat_item, item_type)
 
@@ -480,38 +308,6 @@ class Henge(object):
         # jsonschema do this automatically?
         # also item_type ?
 
-        def safestr(item, x):
-            try:
-                return str(item[x])
-            except (ValueError, TypeError, KeyError):
-                return ""
-
-        def build_attr_string(item, schema, item_name=None):
-            if "type" in schema and schema["type"] == "array":
-                if self.flexible_digests:
-                    return DELIM_ITEM.join([build_attr_string(x, schema['items'])
-                                        for x in item])
-                else:
-                    return DELIM_ITEM.join([build_attr_string(x, schema['items'])
-                                        for x in item])
-            elif schema["type"] == "object" and 'properties' in schema:
-                if self.flexible_digests:
-                    # flexible schema
-                    keys_to_include = sorted([x for x in item.keys() if x in list(schema['properties'].keys())])
-                    return DELIM_ATTR.join([DELIM_ATTR.join([k, safestr(item, k)]) for k in keys_to_include])
-
-                else:
-                    # fixed schema
-                    return DELIM_ATTR.join([safestr(item, x) for x in
-                                        list(schema['properties'].keys())])
-            else: #assume it's a primitive
-                if self.flexible_digests:
-                    return item
-                    attr_string = DELIM_ATTR.join([item_name, item])
-                    return attr_string
-                else:
-                    return item
-
         valid_schema = self.schemas[item_type]
         # Add defaults here ?
         try: 
@@ -539,18 +335,22 @@ class Henge(object):
 
             raise e
             return None
-            
-        attr_string = canonical_str(item)
+        
+        _LOGGER.debug(f"item to insert: {item}")        
+        item_inherent_split = select_inherent_properties(item, valid_schema)
+        attr_string = canonical_str(item_inherent_split["inherent"])
+        external_string = canonical_str(item_inherent_split["external"])
 
         _LOGGER.debug(f"String to digest: {attr_string}")
+        _LOGGER.debug(f"External string: {external_string}")
         druid = self.checksum_function(attr_string)
-        self._henge_insert(druid, attr_string, item_type)
+        self._henge_insert(druid, attr_string, item_type, external_string)
 
         _LOGGER.debug("Inserted flat item. Digest: {} / Type: {} / Item: {}".format(
             druid, item_type, item))
         return druid
 
-    def _henge_insert(self, druid, string, item_type, digest_version=None):
+    def _henge_insert(self, druid, string, item_type, external_string, digest_version=None):
         """
         Inserts an item into the database, with henge-metadata slots for item
         type and digest version.
@@ -571,6 +371,7 @@ class Henge(object):
             henge_to_query.database[druid] = string
             henge_to_query.database[druid + ITEM_TYPE] = item_type
             henge_to_query.database[druid + "_digest_version"] = digest_version
+            henge_to_query.database[druid + "_external_string"] = external_string
 
             if henge_to_query != self:
                 self.database[druid + ITEM_TYPE] = item_type
@@ -582,13 +383,16 @@ class Henge(object):
         """
         Remove all items from this database.
         """
-        for k, v in self.database.items():
-            try:
-                del self.database[k]
-                del self.database[k + ITEM_TYPE]
-                del self.database[k + "_digest_version"]
-            except (KeyError, AttributeError):
-                pass
+        try:
+            for k, v in self.database.items():
+                try:
+                    del self.database[k]
+                    del self.database[k + ITEM_TYPE]
+                    del self.database[k + "_digest_version"]
+                except (KeyError, AttributeError):
+                    pass
+        except AttributeError as e:
+            _LOGGER.warn(f"Error trying to iterate over database items: {e}")                   
 
     def show(self):
         """
@@ -681,10 +485,24 @@ def split_schema(schema, name=None):
     return slist
 
 
-import json
 def canonical_str(item: dict) -> str:
     """ Convert a dict into a canonical string representation """
     return json.dumps(item, separators=(',', ':'), ensure_ascii=False, allow_nan=False, sort_keys=True) 
+
+def select_inherent_properties(item: dict, schema: dict) -> dict:
+    if schema["type"] == "object":
+        item_inherent = {}
+        if "inherent" in schema and schema["inherent"]:
+            for k in schema["inherent"]:
+                item_inherent[k] = item[k]
+                del item[k]
+            return {"inherent": item_inherent, "external": item}
+        else:
+            return {"inherent": item, "external": None}
+    else:
+        return {"inherent": item, "external": None}
+
+
 
 def is_schema_recursive(schema):
     """
@@ -730,52 +548,3 @@ def connect_mongo(host='0.0.0.0', port=27017, database='henge_dict',
         pymongo.MongoClient(host=host, port=port)
     return mongodict.MongoDict(host=host, port=port, database=database,
                                collection=collection)
-
-
-def build_argparser():
-    # TODO: add cli hooks for ^
-    """
-    Builds argument parser.
-
-    :return argparse.ArgumentParser
-    """
-    banner = "%(prog)s - Keeper of druids: " \
-             "a python interface to Decomposable Recursive UIDs"
-    additional_description = "\n..."
-    parser = VersionInHelpParser(version=__version__, description=banner,
-                                 epilog=additional_description)
-
-    parser.add_argument(
-            "-V", "--version",
-            action="version",
-            version="%(prog)s {v}".format(v=__version__))
-
-    parser.add_argument(
-            "-i", "--input", required=True,
-            help="File path to input file.")
-
-    parser.add_argument(
-            "-p", "--parameter", type=int, default=0,
-            help="Some parameter.")
-
-    return parser
-
-
-def main():
-    """ Primary workflow """
-
-    parser = logmuse.add_logging_options(build_argparser())
-    args = parser.parse_args()
-    global _LOGGER
-    _LOGGER = logmuse.logger_via_cli(args, make_root=True)
-
-    msg = "Input: {input}; Parameter: {parameter}"
-    _LOGGER.info(msg.format(input=args.input, parameter=args.parameter))
-
-
-if __name__ == '__main__':
-    try:
-        sys.exit(main())
-    except KeyboardInterrupt:
-        _LOGGER.error("Program canceled by user!")
-        sys.exit(1)
