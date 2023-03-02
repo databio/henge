@@ -142,11 +142,11 @@ class Henge(object):
         :param bool raw: Return the value as a raw, henge-delimited string, instead
             of processing into a mapping. Default: False.
         """
-        try: 
+        try:
             item_type = self.database[druid + ITEM_TYPE]
         except KeyError:
             raise NotFoundException(druid)
-            
+
         digested_string = self.lookup(druid, item_type)
         reconstructed_item = json.loads(digested_string)
 
