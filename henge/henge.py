@@ -142,7 +142,11 @@ class Henge(object):
         :param bool raw: Return the value as a raw, henge-delimited string, instead
             of processing into a mapping. Default: False.
         """
-        item_type = self.database[druid + ITEM_TYPE]
+        try:
+            item_type = self.database[druid + ITEM_TYPE]
+        except KeyError:
+            raise NotFoundException(druid)
+
         digested_string = self.lookup(druid, item_type)
         reconstructed_item = json.loads(digested_string)
 
@@ -476,11 +480,14 @@ def split_schema(schema, name=None):
                         schema_copy["properties"][p]["henge_class"] = hclass
                 if schema_copy["properties"][p]["type"] in ["array"]:
                     # recursive_properties.append(p)
-                    schema_copy["properties"][p] = {"type": "string"}
+                    if schema_copy["properties"][p]["items"]["type"] == "integer":
+                        schema_copy["properties"][p] = {"type": "string"}
+                    else:
+                        schema_copy["properties"][p] = {"type": "string"}
                     if hclass:
                         schema_copy["properties"][p]["henge_class"] = hclass
                     else:
-                        schema_copy["properties"][p]["henge_class"] = "array"
+                        schema_copy["properties"][p]["henge_class"] = "strarray"
                     # schema_copy['properties'][p]['type'] = "string"
             # del schema_copy['properties']
             _LOGGER.debug(
@@ -503,7 +510,8 @@ def split_schema(schema, name=None):
             _LOGGER.debug("adding " + str(schema["henge_class"]))
             henge_class = schema_copy["henge_class"]
             # del schema_copy['henge_class']
-            schema_copy["items"] = {"type": "string"}
+            if schema_copy["items"]["type"] != "integer":
+                schema_copy["items"] = {"type": "string"}
             if "recursive" in schema_copy and schema_copy["recursive"]:
                 schema_copy["items"]["recursive"] = True
             if "henge_class" in schema["items"]:
