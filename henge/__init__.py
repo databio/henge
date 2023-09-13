@@ -9,4 +9,5 @@ __all__ = __classes__ + [
     "split_schema",
     "NotFoundException",
     "canonical_str",
+    "sha512t24u_digest"
 ]
