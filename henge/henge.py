@@ -449,6 +449,9 @@ class Henge(object):
         for k, v in self.database.items():
             print(k, v)
 
+    def __len__(self):
+        return len(self.database)
+
     def __repr__(self):
         repr = "Henge object. Item types: " + ",".join(self.item_types)
         return repr
