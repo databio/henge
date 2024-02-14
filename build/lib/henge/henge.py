@@ -1,10 +1,11 @@
 """ An interface to a database back-end for DRUIDs """
 
+import base64
 import copy
 import hashlib
 import jsonschema
-import logging
 import json
+import logging
 import os
 import sys
 import yacman
@@ -27,6 +28,12 @@ class NotFoundException(Exception):
     def __str__(self):
         return self.message
 
+
+def sha512t24u_digest(seq: str, offset: int = 24) -> str:
+    """ GA4GH digest function """
+    digest = hashlib.sha512(seq.encode()).digest()
+    tdigest_b64us = base64.urlsafe_b64encode(digest[:offset])
+    return tdigest_b64us.decode("ascii")
 
 def md5(seq):
     return hashlib.md5(seq.encode()).hexdigest()
@@ -142,11 +149,11 @@ class Henge(object):
         :param bool raw: Return the value as a raw, henge-delimited string, instead
             of processing into a mapping. Default: False.
         """
-        try: 
+        try:
             item_type = self.database[druid + ITEM_TYPE]
         except KeyError:
             raise NotFoundException(druid)
-            
+
         digested_string = self.lookup(druid, item_type)
         reconstructed_item = json.loads(digested_string)
 
@@ -441,6 +448,17 @@ class Henge(object):
         """
         for k, v in self.database.items():
             print(k, v)
+
+    def list(self, limit=1000, offset=0):
+        """
+        List all items in the database.
+        """
+        return {
+            "count": len(self.database),
+            "limit": limit,
+            "offset": offset,
+            "items": list(self.database.keys())[offset:(offset+limit)],
+        }
 
     def __repr__(self):
         repr = "Henge object. Item types: " + ",".join(self.item_types)
