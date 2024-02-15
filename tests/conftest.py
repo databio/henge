@@ -1,4 +1,5 @@
 """ Test suite shared objects and setup """
+
 import os
 import pytest
 import oyaml as yaml

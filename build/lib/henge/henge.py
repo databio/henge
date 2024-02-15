@@ -449,6 +449,17 @@ class Henge(object):
         for k, v in self.database.items():
             print(k, v)
 
+    def list(self, limit=1000, offset=0):
+        """
+        List all items in the database.
+        """
+        return {
+            "count": len(self.database),
+            "limit": limit,
+            "offset": offset,
+            "items": list(self.database.keys())[offset:(offset+limit)],
+        }
+
     def __repr__(self):
         repr = "Henge object. Item types: " + ",".join(self.item_types)
         return repr
