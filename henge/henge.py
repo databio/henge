@@ -57,7 +57,6 @@ def read_url(url):
         raise e
     data = response.read()  # a `bytes` object
     text = data.decode("utf-8")
-    print(text)
     return yaml.safe_load(text)
 
 
