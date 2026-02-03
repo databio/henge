@@ -1,6 +1,5 @@
 #! /usr/bin/env python
 
-import os
 from setuptools import setup
 import sys
 
@@ -35,10 +34,10 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "License :: OSI Approved :: BSD License",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
         "Topic :: System :: Distributed Computing",
     ],
     keywords="",
@@ -46,10 +45,7 @@ setup(
     author="Nathan Sheffield",
     author_email="nathan@code.databio.org",
     license="BSD2",
-    entry_points={
-        "console_scripts": ["packagename = packagename.packagename:main"],
-    },
-    package_data={"packagename": [os.path.join("packagename", "*")]},
+    python_requires=">=3.10",
     include_package_data=True,
     test_suite="tests",
     tests_require=(["pytest"]),
