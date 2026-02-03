@@ -1,7 +1,5 @@
 # Henge
 
-[![Build Status](https://travis-ci.com/databio/henge.svg?branch=master)](https://travis-ci.com/databio/henge)
-
 Henge is a Python package for building data storage and retrieval interfaces for arbitrary data. Henge is based on the idea of **decomposable recursive unique identifiers (DRUIDs)**, which are hash-based unique identifiers for data derived from the data itself. For arbitrary data with any structure, Henge can mint unique DRUIDs to identify data, store the data in a key-value database of your choice, and provide lookup functions to retrieve the data in its original structure using its DRUID identifier.
 
 Henge was intended as a building block for [sequence collections](https://github.com/refgenie/seqcol), but is generic enough to use for any data type that needs content-derived identifiers with database lookup capability.
