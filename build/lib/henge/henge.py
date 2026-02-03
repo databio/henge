@@ -1,4 +1,4 @@
-""" An interface to a database back-end for DRUIDs """
+"""An interface to a database back-end for DRUIDs"""
 
 import base64
 import copy
@@ -30,10 +30,11 @@ class NotFoundException(Exception):
 
 
 def sha512t24u_digest(seq: str, offset: int = 24) -> str:
-    """ GA4GH digest function """
+    """GA4GH digest function"""
     digest = hashlib.sha512(seq.encode()).digest()
     tdigest_b64us = base64.urlsafe_b64encode(digest[:offset])
     return tdigest_b64us.decode("ascii")
+
 
 def md5(seq):
     return hashlib.md5(seq.encode()).hexdigest()
@@ -56,7 +57,6 @@ def read_url(url):
         raise e
     data = response.read()  # a `bytes` object
     text = data.decode("utf-8")
-    print(text)
     return yaml.safe_load(text)
 
 
@@ -250,8 +250,9 @@ class Henge(object):
 
         if item_type not in self.schemas.keys():
             _LOGGER.error(
-                "I don't know about items of type '{}'. "
-                "I know of: '{}'".format(item_type, list(self.schemas.keys()))
+                "I don't know about items of type '{}'. I know of: '{}'".format(
+                    item_type, list(self.schemas.keys())
+                )
             )
             return False
 
@@ -335,8 +336,9 @@ class Henge(object):
         """
         if item_type not in self.schemas.keys():
             _LOGGER.error(
-                "I don't know about items of type '{}'. "
-                "I know of: '{}'".format(item_type, list(self.schemas.keys()))
+                "I don't know about items of type '{}'. I know of: '{}'".format(
+                    item_type, list(self.schemas.keys())
+                )
             )
             return False
 
@@ -449,6 +451,9 @@ class Henge(object):
         for k, v in self.database.items():
             print(k, v)
 
+    def __len__(self):
+        return len(self.database)
+
     def list(self, limit=1000, offset=0):
         """
         List all items in the database.
@@ -457,7 +462,7 @@ class Henge(object):
             "count": len(self.database),
             "limit": limit,
             "offset": offset,
-            "items": list(self.database.keys())[offset:(offset+limit)],
+            "items": list(self.database.keys())[offset : (offset + limit)],
         }
 
     def __repr__(self):

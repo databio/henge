@@ -1,4 +1,4 @@
-""" An interface to a database back-end for DRUIDs """
+"""An interface to a database back-end for DRUIDs"""
 
 import base64
 import copy
@@ -57,14 +57,18 @@ def read_url(url):
         raise e
     data = response.read()  # a `bytes` object
     text = data.decode("utf-8")
-    print(text)
     return yaml.safe_load(text)
 
 
 class Henge(object):
     def __init__(
-        self, database, schemas, schemas_str=[], henges=None, checksum_function=md5
-    ):
+        self,
+        database: dict,
+        schemas: list[str],
+        schemas_str: list[str] = None,
+        henges: dict = None,
+        checksum_function: callable = md5,
+    ) -> None:
         """
         A user interface to insert and retrieve decomposable recursive unique
         identifiers (DRUIDs).
@@ -115,7 +119,7 @@ class Henge(object):
                         )
                         # populated_schemas.append(yaml.safe_load(schema_value))
 
-            for schema_value in schemas_str:
+            for schema_value in schemas_str or []:
                 populated_schemas.append(yaml.safe_load(schema_value))
 
             split_schemas = {}
@@ -140,7 +144,9 @@ class Henge(object):
                     self.schemas[item_type] = henge.schemas[item_type]
                     self.henges[item_type] = henge
 
-    def retrieve(self, druid, reclimit=None, raw=False):
+    def retrieve(
+        self, druid: str, reclimit: int = None, raw: bool = False
+    ) -> dict | list:
         """
         Retrieve an item given a digest
 
@@ -202,7 +208,7 @@ class Henge(object):
     def lookup(self, druid, item_type):
         try:
             henge_to_query = self.henges[item_type]
-        except:
+        except KeyError:
             _LOGGER.debug("No henges available for this item type")
             raise NotFoundException(druid)
         try:
@@ -236,7 +242,9 @@ class Henge(object):
                 continue
         return valid_schemas
 
-    def insert(self, item, item_type, reclimit=None):
+    def insert(
+        self, item: dict | list, item_type: str, reclimit: int = None
+    ) -> str | bool:
         """
         Add structured items of a specified type to the database.
 
@@ -251,8 +259,9 @@ class Henge(object):
 
         if item_type not in self.schemas.keys():
             _LOGGER.error(
-                "I don't know about items of type '{}'. "
-                "I know of: '{}'".format(item_type, list(self.schemas.keys()))
+                "I don't know about items of type '{}'. I know of: '{}'".format(
+                    item_type, list(self.schemas.keys())
+                )
             )
             return False
 
@@ -336,8 +345,9 @@ class Henge(object):
         """
         if item_type not in self.schemas.keys():
             _LOGGER.error(
-                "I don't know about items of type '{}'. "
-                "I know of: '{}'".format(item_type, list(self.schemas.keys()))
+                "I don't know about items of type '{}'. I know of: '{}'".format(
+                    item_type, list(self.schemas.keys())
+                )
             )
             return False
 
@@ -357,7 +367,7 @@ class Henge(object):
                     item_type, item
                 )
             )
-            print(e)
+            _LOGGER.error(e)
 
             if isinstance(item, str):
                 henge_to_query = self.henges[item_type]
@@ -378,7 +388,6 @@ class Henge(object):
                 return item
 
             raise e
-            return None
 
         _LOGGER.debug(f"item to insert: {item}")
         item_inherent_split = select_inherent_properties(item, valid_schema)
@@ -416,17 +425,14 @@ class Henge(object):
 
         henge_to_query = self.henges[item_type]
         # _LOGGER.debug("henge_to_query: {}".format(henge_to_query))
-        try:
-            henge_to_query.database[druid] = string
-            henge_to_query.database[druid + ITEM_TYPE] = item_type
-            henge_to_query.database[druid + "_digest_version"] = digest_version
-            henge_to_query.database[druid + "_external_string"] = external_string
+        henge_to_query.database[druid] = string
+        henge_to_query.database[druid + ITEM_TYPE] = item_type
+        henge_to_query.database[druid + "_digest_version"] = digest_version
+        henge_to_query.database[druid + "_external_string"] = external_string
 
-            if henge_to_query != self:
-                self.database[druid + ITEM_TYPE] = item_type
-                self.database[druid + "_digest_version"] = digest_version
-        except Exception as e:
-            raise e
+        if henge_to_query != self:
+            self.database[druid + ITEM_TYPE] = item_type
+            self.database[druid + "_digest_version"] = digest_version
 
     def clean(self):
         """
@@ -448,7 +454,10 @@ class Henge(object):
         Show all items in the database.
         """
         for k, v in self.database.items():
-            print(k, v)
+            _LOGGER.info(f"{k} {v}")
+
+    def __len__(self):
+        return len(self.database)
 
     def list(self, limit=1000, offset=0):
         """

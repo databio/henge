@@ -56,5 +56,5 @@ setup(
     setup_requires=(
         ["pytest-runner"] if {"test", "pytest", "ptr"} & set(sys.argv) else []
     ),
-    **extra
+    **extra,
 )
