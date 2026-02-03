@@ -76,7 +76,10 @@ class PipestatMapping(pipestat.PipestatManager):
         if self._buf["current_view_index"] > self._buf["len"]:
             raise StopIteration
 
-        idx = self._buf["current_view_index"] - self._buf["page_index"] * self._buf["page_size"]
+        idx = (
+            self._buf["current_view_index"]
+            - self._buf["page_index"] * self._buf["page_size"]
+        )
         if idx <= self._buf["page_size"]:
             self._buf["current_view_index"] += 1
             return self._buf["keys"][idx - 1]
@@ -224,12 +227,10 @@ class RDBDict(Mapping):
                 return None
         except OperationalError as e:
             _LOGGER.info("Error: {e}".format(e=str(e)))
-            raise Exception
-            return None
+            raise
         except TypeError as e:
             _LOGGER.info("TypeError: {e}, item: {q}".format(e=str(e), q=query))
-            raise Exception
-            return None
+            raise
 
     def execute_multi_query(self, query, params=None):
         cursor = self.connection.cursor()
@@ -240,12 +241,10 @@ class RDBDict(Mapping):
             return result
         except OperationalError as e:
             _LOGGER.info("Error: {e}".format(e=str(e)))
-            raise Exception
-            return None
+            raise
         except TypeError as e:
-            pri_LOGGER.infont("TypeError: {e}, item: {q}".format(e=str(e), q=query))
-            raise Exception
-            return None
+            _LOGGER.info("TypeError: {e}, item: {q}".format(e=str(e), q=query))
+            raise
 
     def execute_query(self, query, params=None):
         cursor = self.connection.cursor()
@@ -269,18 +268,22 @@ class RDBDict(Mapping):
             SELECT COUNT(*) FROM {table}
         """
         ).format(table=sql.Identifier(self.db_table))
-        print(stmt)
+        _LOGGER.debug(stmt)
         res = self.execute_read_query(stmt)
         return res
 
     def get_paged_keys(self, limit=None, offset=None):
-        stmt_str = "SELECT key FROM {table}"
-        if limit:
-            stmt_str += f" LIMIT {limit}"
-        if offset != None:
-            stmt_str += f" OFFSET {offset}"
-        stmt = sql.SQL(stmt_str).format(table=sql.Identifier(self.db_table))
-        res = self.execute_multi_query(stmt)
+        stmt = sql.SQL("SELECT key FROM {table}").format(
+            table=sql.Identifier(self.db_table)
+        )
+        params = {}
+        if limit is not None:
+            stmt = sql.SQL("{} LIMIT %(limit)s").format(stmt)
+            params["limit"] = limit
+        if offset is not None:
+            stmt = sql.SQL("{} OFFSET %(offset)s").format(stmt)
+            params["offset"] = offset
+        res = self.execute_multi_query(stmt, params if params else None)
         return res
 
     def _next_page(self):
@@ -305,7 +308,10 @@ class RDBDict(Mapping):
         if self._buf["current_view_index"] > self._buf["len"]:
             raise StopIteration
 
-        idx = self._buf["current_view_index"] - self._buf["page_index"] * self._buf["page_size"]
+        idx = (
+            self._buf["current_view_index"]
+            - self._buf["page_index"] * self._buf["page_size"]
+        )
         if idx <= self._buf["page_size"]:
             self._buf["current_view_index"] += 1
             return self._buf["keys"][idx - 1]

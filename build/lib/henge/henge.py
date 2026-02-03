@@ -1,4 +1,4 @@
-""" An interface to a database back-end for DRUIDs """
+"""An interface to a database back-end for DRUIDs"""
 
 import base64
 import copy
@@ -250,8 +250,9 @@ class Henge(object):
 
         if item_type not in self.schemas.keys():
             _LOGGER.error(
-                "I don't know about items of type '{}'. "
-                "I know of: '{}'".format(item_type, list(self.schemas.keys()))
+                "I don't know about items of type '{}'. I know of: '{}'".format(
+                    item_type, list(self.schemas.keys())
+                )
             )
             return False
 
@@ -335,8 +336,9 @@ class Henge(object):
         """
         if item_type not in self.schemas.keys():
             _LOGGER.error(
-                "I don't know about items of type '{}'. "
-                "I know of: '{}'".format(item_type, list(self.schemas.keys()))
+                "I don't know about items of type '{}'. I know of: '{}'".format(
+                    item_type, list(self.schemas.keys())
+                )
             )
             return False
 
@@ -451,7 +453,7 @@ class Henge(object):
 
     def __len__(self):
         return len(self.database)
-    
+
     def list(self, limit=1000, offset=0):
         """
         List all items in the database.
