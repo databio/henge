@@ -71,6 +71,7 @@ open_pipelines/
 *RESERVE*
 
 # Build-related stuff
+build/
 dist/
 *.egg-info/
 

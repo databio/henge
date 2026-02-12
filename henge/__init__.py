@@ -1,7 +1,10 @@
-# Project configuration.
+"""Henge: Storage and retrieval of decomposable recursive unique identifiers."""
 
-from ._version import __version__
+from importlib.metadata import version
+
 from .henge import *
+
+__version__ = version("henge")
 
 __classes__ = ["Henge"]
 __all__ = __classes__ + [
