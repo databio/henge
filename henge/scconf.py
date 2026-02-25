@@ -1,41 +1,33 @@
+"""Database backend classes for henge."""
+
 import logging
 import os
-import psycopg2
-
 from collections.abc import Mapping
+
+import pipestat
+import psycopg2
 from psycopg2 import OperationalError, sql
 from psycopg2.errors import UniqueViolation
 
 _LOGGER = logging.getLogger(__name__)
 
-# Use like:
-# pgdb = RDBDict(...)       # Open connection
-# pgdb["key"] = "value"     # Insert item
-# pgdb["key"]               # Retrieve item
-# pgdb.close()              # Close connection
 
+def getenv(varname: str) -> str:
+    """Get an environment variable or raise informative error.
 
-# This was originally written in seqcolapi.
-# I am moving it here in 2025, because the whole point was to enable
-# interesting database back-ends to have dict-style key-value pair
-# mechanisms, which was enabling henge to use these various backends
-# to back arbitrary databases.
-# with the move to sqlmodel, I abandoned the henge backend approach,
-# so intermediates are no longer important for seqcol.
+    Args:
+        varname: Name of environment variable.
 
-# they could become relevant for other henge use cases, so they
-# fit better here now.
+    Returns:
+        Value of environment variable.
 
-
-def getenv(varname):
-    """Simple wrapper to make the Exception more informative for missing env var"""
+    Raises:
+        Exception: If the environment variable is not set.
+    """
     try:
         return os.environ[varname]
     except KeyError:
         raise Exception(f"Environment variable {varname} not set.")
-
-
-import pipestat
 
 
 class PipestatMapping(pipestat.PipestatManager):
@@ -184,7 +176,7 @@ class RDBDict(Mapping):
     def __setitem__(self, key, value):
         try:
             return self.insert(key, value)
-        except UniqueViolation as e:
+        except UniqueViolation:
             _LOGGER.info("Updating existing value for {}".format(key))
             return self.update(key, value)
 

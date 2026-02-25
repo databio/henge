@@ -1,6 +1,23 @@
 # Changelog
 
-This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format. 
+This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format.
+
+## [0.3.0] -- 2026-02-13
+
+### Changed
+
+- Migrated to pyproject.toml with hatchling backend
+- Updated yacman requirement to >=0.9.5 (for yacman v1 release)
+- Updated ubiquerg requirement to >=0.9.0
+- Added Python 3.14 support
+- Converted docstrings to Google style
+- Added type hints throughout
+- Added ruff linting in CI
+
+### Removed
+
+- Removed deprecated.py dead code
+- Removed legacy setup.py packaging
 
 ## [0.2.3] -- 2026-02-03
 

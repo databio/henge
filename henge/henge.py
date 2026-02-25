@@ -1,87 +1,101 @@
-"""An interface to a database back-end for DRUIDs"""
+"""An interface to a database back-end for DRUIDs."""
 
 import base64
 import copy
 import hashlib
-import jsonschema
 import json
 import logging
 import os
-import sys
+from collections.abc import Callable
+
+import jsonschema
 import yacman
 import yaml
 
-from ubiquerg import VersionInHelpParser
-
-from . import __version__
-from .const import *
+from .const import ITEM_TYPE, LIBS_BY_BACKEND
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class NotFoundException(Exception):
-    """Raised when a digest is not found"""
+    """Raised when a digest is not found."""
 
-    def __init__(self, m):
-        self.message = "{} not found in database".format(m)
+    def __init__(self, m: str) -> None:
+        self.message = f"{m} not found in database"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.message
 
 
 def sha512t24u_digest(seq: str, offset: int = 24) -> str:
-    """GA4GH digest function"""
+    """Compute GA4GH truncated SHA-512 digest.
+
+    Args:
+        seq: The sequence to digest.
+        offset: Number of bytes to truncate to.
+
+    Returns:
+        URL-safe base64-encoded truncated digest.
+    """
     digest = hashlib.sha512(seq.encode()).digest()
     tdigest_b64us = base64.urlsafe_b64encode(digest[:offset])
     return tdigest_b64us.decode("ascii")
 
 
-def md5(seq):
+def md5(seq: str) -> str:
+    """Compute MD5 hash of a string."""
     return hashlib.md5(seq.encode()).hexdigest()
 
 
-def is_url(maybe_url):
+def is_url(maybe_url: str) -> bool:
+    """Check if a string looks like a URL."""
     from urllib.parse import urlparse
 
     return " " not in maybe_url and urlparse(maybe_url).scheme != ""
 
 
-def read_url(url):
-    _LOGGER.info("Reading URL: {}".format(url))
-    from urllib.request import urlopen
+def read_url(url: str) -> dict:
+    """Fetch and parse YAML from a URL.
+
+    Args:
+        url: URL to fetch.
+
+    Returns:
+        Parsed YAML content.
+    """
+    _LOGGER.info(f"Reading URL: {url}")
     from urllib.error import HTTPError
+    from urllib.request import urlopen
 
     try:
         response = urlopen(url)
     except HTTPError as e:
         raise e
-    data = response.read()  # a `bytes` object
+    data = response.read()
     text = data.decode("utf-8")
     return yaml.safe_load(text)
 
 
-class Henge(object):
+class Henge:
+    """Interface for storing and retrieving decomposable recursive unique identifiers (DRUIDs)."""
+
     def __init__(
         self,
         database: dict,
-        schemas: list[str],
-        schemas_str: list[str] = None,
-        henges: dict = None,
-        checksum_function: callable = md5,
+        schemas: list[str] | dict,
+        schemas_str: list[str] | None = None,
+        henges: dict | None = None,
+        checksum_function: Callable[[str], str] = md5,
     ) -> None:
-        """
-        A user interface to insert and retrieve decomposable recursive unique
-        identifiers (DRUIDs).
+        """Initialize a Henge instance.
 
-        :param dict database: Dict-like lookup database for sequences and
-            hashes.
-        :param list schemas: A list of file paths containing YAML jsonschema schemas describing the
-            data types stored by this Henge
-        :param list schemas_str: A list of strings containing YAML jsonschema schemas directly
-        :param dict henges: One or more henge objects indexed by object name for
-            remote storing of items.
-        :param function(str) -> str checksum_function: Default function to
-            handle the digest of the serialized items stored in this henge.
+        Args:
+            database: Dict-like lookup database for sequences and hashes.
+            schemas: List of file paths or URLs to YAML jsonschema schemas,
+                or a dict mapping schema names to schema definitions.
+            schemas_str: List of YAML schema strings (parsed directly).
+            henges: Henge objects indexed by item type for remote storage.
+            checksum_function: Function to compute digest of serialized items.
         """
         self.database = database
         self.checksum_function = checksum_function
@@ -145,16 +159,20 @@ class Henge(object):
                     self.henges[item_type] = henge
 
     def retrieve(
-        self, druid: str, reclimit: int = None, raw: bool = False
+        self, druid: str, reclimit: int | None = None, raw: bool = False
     ) -> dict | list:
-        """
-        Retrieve an item given a digest
+        """Retrieve an item by its digest.
 
-        :param str druid: The Decomposable recursive unique identifier (DRUID), or
-            digest that uniquely identifies that item to retrieve.
-        :param int reclimit: Recursion limit. Set to None for no limit (default).
-        :param bool raw: Return the value as a raw, henge-delimited string, instead
-            of processing into a mapping. Default: False.
+        Args:
+            druid: Decomposable recursive unique identifier (DRUID) to retrieve.
+            reclimit: Recursion limit. None for no limit.
+            raw: Return raw henge-delimited string instead of parsed mapping.
+
+        Returns:
+            The retrieved item as a dict or list.
+
+        Raises:
+            NotFoundException: If the druid is not found.
         """
         try:
             item_type = self.database[druid + ITEM_TYPE]
@@ -205,7 +223,7 @@ class Henge(object):
                             )
         return reconstructed_item
 
-    def lookup(self, druid, item_type):
+    def lookup(self, druid: str, item_type: str) -> str:
         try:
             henge_to_query = self.henges[item_type]
         except KeyError:
@@ -219,18 +237,18 @@ class Henge(object):
         return string
 
     @property
-    def item_types(self):
-        """
-        A list of item types handled by this Henge instance
-        """
+    def item_types(self) -> list[str]:
+        """List of item types handled by this Henge instance."""
         return list(self.schemas.keys())
 
-    def select_item_type(self, item):
-        """
-        Returns a list of all item types handled by this instance that validate
-        with the given item.
+    def select_item_type(self, item: dict) -> list[str]:
+        """Find all item types that validate against the given item.
 
-        :param dict item: The item you wish to validate type of.
+        Args:
+            item: The item to validate.
+
+        Returns:
+            List of matching item type names.
         """
         valid_schemas = []
         for name, schema in self.schemas.items():
@@ -243,16 +261,17 @@ class Henge(object):
         return valid_schemas
 
     def insert(
-        self, item: dict | list, item_type: str, reclimit: int = None
+        self, item: dict | list, item_type: str, reclimit: int | None = None
     ) -> str | bool:
-        """
-        Add structured items of a specified type to the database.
+        """Add a structured item to the database.
 
-        :param list item: List of items to add.
-        :param str item_type: A string specifying the type of item. Must match
-            something from Henge.list_item_types. You can use
-            Henge.select_item_type to automatically choose this, if only one
-            fits.
+        Args:
+            item: The item to add.
+            item_type: Item type name (must match a schema in item_types).
+            reclimit: Recursion limit for nested items.
+
+        Returns:
+            The digest (DRUID) of the inserted item, or False on failure.
         """
 
         _LOGGER.debug("Insert type: {} / Item: {}".format(item_type, item))
@@ -329,19 +348,24 @@ class Henge(object):
 
         return self._insert_flat(flat_item, item_type)
 
-    def _insert_flat(self, item, item_type=None, item_name=None):
-        """
-        Add flattened items (of a specified type) to the database.
+    def _insert_flat(
+        self,
+        item: dict | list,
+        item_type: str | None = None,
+        item_name: str | None = None,
+    ) -> str | bool:
+        """Add a flattened item to the database.
 
-        Flattened items have removed all levels, so it's only attributes and
-        strict values; no nesting allowed. Use the upstream insert function
-        to insert full structured objects, which calls this function.
+        Flattened items have no nesting - only attributes and primitive values.
+        Use insert() for structured objects; it calls this internally.
 
-        :param list item: List of items to add.
-        :param str item_type: A string specifying the type of item. Must match
-            something from Henge.list_item_types. You can use
-            Henge.select_item_type to automatically choose this, if only one
-            fits.
+        Args:
+            item: The flattened item to add.
+            item_type: Item type name (must match a schema).
+            item_name: Optional item name.
+
+        Returns:
+            The digest (DRUID) of the inserted item, or False on failure.
         """
         if item_type not in self.schemas.keys():
             _LOGGER.error(
@@ -372,19 +396,17 @@ class Henge(object):
             if isinstance(item, str):
                 henge_to_query = self.henges[item_type]
                 try:
-                    existing_item_type = henge_to_query.database[item + ITEM_TYPE]
+                    _ = henge_to_query.database[item + ITEM_TYPE]
                 except KeyError:
                     _LOGGER.error(
-                        "If you're trying to insert an item with druids, the sub-items must exist in the database."
+                        "If you're trying to insert an item with druids, "
+                        "the sub-items must exist in the database."
                     )
-                    # return None
                 try:
-                    existing_item = henge_to_query.database[item]
+                    _ = henge_to_query.database[item]
                 except KeyError:
                     _LOGGER.error("That item wasn't in the database.")
 
-                # if (item_type == existing_item_type):
-                # _LOGGER.info("But wait!!! That's already here, and it's great! I'll return that!")
                 return item
 
             raise e
@@ -407,12 +429,14 @@ class Henge(object):
         return druid
 
     def _henge_insert(
-        self, druid, string, item_type, external_string, digest_version=None
-    ):
-        """
-        Inserts an item into the database, with henge-metadata slots for item
-        type and digest version.
-        """
+        self,
+        druid: str,
+        string: str,
+        item_type: str,
+        external_string: str,
+        digest_version: str | None = None,
+    ) -> None:
+        """Insert an item with henge metadata (item type, digest version)."""
         if not digest_version:
             digest_version = self.digest_version
 
@@ -434,10 +458,8 @@ class Henge(object):
             self.database[druid + ITEM_TYPE] = item_type
             self.database[druid + "_digest_version"] = digest_version
 
-    def clean(self):
-        """
-        Remove all items from this database.
-        """
+    def clean(self) -> None:
+        """Remove all items from this database."""
         try:
             for k, v in self.database.items():
                 try:
@@ -449,20 +471,16 @@ class Henge(object):
         except AttributeError as e:
             _LOGGER.warn(f"Error trying to iterate over database items: {e}")
 
-    def show(self):
-        """
-        Show all items in the database.
-        """
+    def show(self) -> None:
+        """Log all items in the database."""
         for k, v in self.database.items():
             _LOGGER.info(f"{k} {v}")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.database)
 
-    def list(self, limit=1000, offset=0):
-        """
-        List all items in the database.
-        """
+    def list(self, limit: int = 1000, offset: int = 0) -> dict:
+        """List items in the database with pagination."""
         return {
             "count": len(self.database),
             "limit": limit,
@@ -475,10 +493,8 @@ class Henge(object):
         return repr
 
 
-def split_schema(schema, name=None):
-    """
-    Splits a hierarchical schema into flat components suitable for a Henge
-    """
+def split_schema(schema: dict, name: str | None = None) -> dict:
+    """Split a hierarchical schema into flat components for a Henge."""
     slist = {}
     # base case
     if schema["type"] not in ["object", "array"]:
@@ -580,12 +596,8 @@ def select_inherent_properties(item: dict, schema: dict) -> dict:
         return {"inherent": item, "external": None}
 
 
-def is_schema_recursive(schema):
-    """
-    Determine if a given schema has elements that need to recurse
-    """
-    # return 'recursive' in schema # old way
-    is_recursive = False
+def is_schema_recursive(schema: dict) -> bool:
+    """Check if a schema has elements that require recursion."""
     if schema["type"] == "object":
         for prop in schema["properties"]:
             if schema["properties"]["prop"]["type"] in ["object", "array"]:
@@ -597,19 +609,21 @@ def is_schema_recursive(schema):
 
 
 def connect_mongo(
-    host="0.0.0.0", port=27017, database="henge_dict", collection="store"
+    host: str = "0.0.0.0",
+    port: int = 27017,
+    database: str = "henge_dict",
+    collection: str = "store",
 ):
-    """
-    Connect to MongoDB and return the MongoDB-backed dict object
+    """Connect to MongoDB and return a dict-like backend.
 
-    Firstly, the required libraries are imported.
+    Args:
+        host: Database address.
+        port: Database port.
+        database: Database name.
+        collection: Collection name.
 
-    :param str host: DB address
-    :param int port: port DB is listening on
-    :param str database: DB name
-    :param str collection: collection key
-    :return mongodict.MongoDict: a dict backed by MongoDB, ready to use as a
-        Henge backend
+    Returns:
+        MongoDict instance for use as a Henge backend.
     """
     from importlib import import_module
     from inspect import stack
@@ -624,9 +638,9 @@ def connect_mongo(
                     lib, stack()[0][3]
                 )
             )
-    pymongo.Connection = lambda host, port, **kwargs: pymongo.MongoClient(
+    pymongo.Connection = lambda host, port, **kwargs: pymongo.MongoClient(  # noqa: F821
         host=host, port=port
     )
-    return mongodict.MongoDict(
+    return mongodict.MongoDict(  # noqa: F821
         host=host, port=port, database=database, collection=collection
     )

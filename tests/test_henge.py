@@ -1,6 +1,7 @@
 import pytest
-from henge import Henge
 from jsonschema import ValidationError
+
+from henge import Henge
 
 # See conftest.py for fixtures
 

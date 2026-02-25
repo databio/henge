@@ -1,3 +1,0 @@
-jsonschema
-ubiquerg>=0.5.2
-yacman>=0.6.7
